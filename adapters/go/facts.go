@@ -38,6 +38,7 @@ const (
 	RelImplements    RelationKind = "implements"
 	RelExtends       RelationKind = "extends"
 	RelReferences    RelationKind = "references"
+	RelDependsOn     RelationKind = "depends-on"
 )
 
 type NodeKey string
@@ -50,18 +51,20 @@ type SourceSpan struct {
 }
 
 type NodeFact struct {
-	Key       NodeKey
-	Kind      NodeKind
-	Path      string
-	Name      string
-	ContentID *ContentID
-	Span      *SourceSpan
+	Key        NodeKey
+	Kind       NodeKind
+	Path       string
+	Name       string
+	ContentID  *ContentID
+	Span       *SourceSpan
+	Attributes map[string]any
 }
 
 type EdgeFact struct {
 	Source, Target NodeKey
 	Relation       RelationKind
 	Span           *SourceSpan
+	Attributes     map[string]any
 }
 
 type UnresolvedReason string
