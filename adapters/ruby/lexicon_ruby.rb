@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "contract"
+require_relative "profiling"
 require_relative "semantic_model"
 require_relative "relationships"
 require_relative "ripper_syntax"

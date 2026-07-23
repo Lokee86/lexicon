@@ -30,6 +30,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gdscript adapter: %v\n", err)
 		os.Exit(1)
 	}
+	if err := adapterMetrics.write(); err != nil {
+		fmt.Fprintf(os.Stderr, "write adapter profile: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func writeFacts(repo, output string, changedFiles, removedFiles []string) error {
@@ -40,8 +44,11 @@ func writeFacts(repo, output string, changedFiles, removedFiles []string) error 
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
+	finishEmission := adapterMetrics.measure("emission")
 	if err := os.WriteFile(output, data, 0o644); err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
+	finishEmission()
+	adapterMetrics.set("output_bytes", int64(len(data)))
 	return nil
 }

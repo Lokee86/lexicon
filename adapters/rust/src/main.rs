@@ -18,6 +18,7 @@ mod model;
 mod orchestrator;
 mod parser;
 mod paths;
+mod profiling;
 mod relationships;
 mod resolve;
 mod semantic;

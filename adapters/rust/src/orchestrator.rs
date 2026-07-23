@@ -13,9 +13,11 @@ pub(crate) fn generate(
     changed_files: Option<&[String]>,
     removed_files: Option<&[String]>,
 ) -> Result<String> {
-    let metadata = discovery::load_metadata(repo)?;
+    let metadata =
+        crate::profiling::measure("metadata_discovery", || discovery::load_metadata(repo))?;
     let repository = discovery::repository_identity(repo, &metadata);
-    let sources = parser::parse_sources(repo)?;
+    let sources = crate::profiling::measure("parsing", || parser::parse_sources(repo))?;
+    crate::profiling::set("files_discovered", sources.len());
     let mut context = Context {
         repo: repo.to_path_buf(),
         repository: repository.clone(),
@@ -49,8 +51,16 @@ pub(crate) fn generate(
         return_values: BTreeMap::new(),
         processed: HashSet::new(),
     };
-    discovery::add_repository_and_files(&mut context);
-    discovery::add_crates(&mut context, &metadata);
-    extractor::extract(&mut context);
-    emit::render(&context, &repository, changed_files, removed_files)
+    crate::profiling::measure("registry_construction", || {
+        discovery::add_repository_and_files(&mut context);
+        discovery::add_crates(&mut context, &metadata);
+    });
+    crate::profiling::measure("semantic_extraction", || extractor::extract(&mut context));
+    crate::profiling::set("files", context.sources.len());
+    crate::profiling::set("nodes", context.facts.nodes.len());
+    crate::profiling::set("edges", context.facts.edges.len());
+    crate::profiling::set("unresolved", context.facts.unresolved.len());
+    crate::profiling::measure("fact_materialization", || {
+        emit::render(&context, &repository, changed_files, removed_files)
+    })
 }

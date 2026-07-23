@@ -19,7 +19,11 @@ module LexiconRuby
       parser.parse!(argv)
       missing = %i[repo output].reject { |key| options[key] }
       abort("missing required option(s): #{missing.map { |key| "--#{key}" }.join(", ")}\n#{parser}") unless missing.empty?
-      LexiconRubyAdapter.new(options[:repo], options[:output], options[:changed_files], options[:removed_files]).run
+      begin
+        LexiconRubyAdapter.new(options[:repo], options[:output], options[:changed_files], options[:removed_files]).run
+      ensure
+        LexiconRuby::Profiling.write
+      end
     rescue OptionParser::ParseError, ArgumentError => error
       abort(error.message)
     end

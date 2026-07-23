@@ -14,6 +14,7 @@ type Request struct {
 	Language     string
 	Repository   string
 	Output       string
+	Profile      string
 	ChangedFiles []string
 	RemovedFiles []string
 }
@@ -33,6 +34,9 @@ func (r Runner) Run(ctx context.Context, request Request) error {
 	command, err := r.command(ctx, request)
 	if err != nil {
 		return err
+	}
+	if request.Profile != "" {
+		command.Env = append(command.Environ(), "LEXICON_ADAPTER_PROFILE="+request.Profile)
 	}
 	data, err := command.CombinedOutput()
 	if err != nil {

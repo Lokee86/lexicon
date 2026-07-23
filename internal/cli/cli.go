@@ -68,6 +68,7 @@ func runInit(ctx context.Context, arguments []string, stdout, stderr io.Writer) 
 	repository := flags.String("repo", "", "repository to initialize")
 	adapterRoot := flags.String("adapters", "", "Lexicon adapters directory")
 	languageText := flags.String("languages", "", "comma-separated languages or all")
+	profilePath := flags.String("profile", "", "write scan profile JSON")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -79,11 +80,13 @@ func runInit(ctx context.Context, arguments []string, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
+	restoreProfile := configureProfile(*profilePath)
+	defer restoreProfile()
 	var report scan.Report
 	if flagWasSet(flags, "languages") {
-		selection, err := parseLanguageSelection(*languageText)
-		if err != nil {
-			return err
+		selection, selectionErr := parseLanguageSelection(*languageText)
+		if selectionErr != nil {
+			return selectionErr
 		}
 		_, report, err = scan.InitializeWithLanguages(ctx, root, adapters, selection, stdout)
 	} else {
@@ -104,6 +107,7 @@ func runScan(ctx context.Context, arguments []string, stdout, stderr io.Writer) 
 	flags := flag.NewFlagSet("scan", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	repository := flags.String("repo", "", "repository to scan")
+	profilePath := flags.String("profile", "", "write scan profile JSON")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -115,6 +119,7 @@ func runScan(ctx context.Context, arguments []string, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
+	scanner.ProfilePath = *profilePath
 	report, err := scanner.Scan(ctx)
 	if err != nil {
 		return err

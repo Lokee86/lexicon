@@ -56,7 +56,9 @@ func scanRepository(root string) (RepositoryFacts, Summary, error) {
 	if err != nil {
 		return RepositoryFacts{}, Summary{}, err
 	}
+	finishModule := adapterMetrics.measure("module_discovery")
 	module, err := readModule(root)
+	finishModule()
 	if err != nil {
 		return RepositoryFacts{}, Summary{}, err
 	}
@@ -68,10 +70,15 @@ func scanRepository(root string) (RepositoryFacts, Summary, error) {
 		semanticIDs:   make(map[string][]NodeKey), closureKeys: make(map[string]NodeKey),
 		callsiteKeys: make(map[string]string), fileImports: make(map[string]map[string]string),
 	}
+	finishDiscovery := adapterMetrics.measure("discovery")
 	files, dirs, err := discover(root)
+	finishDiscovery()
 	if err != nil {
 		return RepositoryFacts{}, Summary{}, err
 	}
+	adapterMetrics.set("files_discovered", int64(len(files)))
+	adapterMetrics.set("directories_discovered", int64(len(dirs)))
+	finishFileFacts := adapterMetrics.measure("file_hashing")
 	if err := s.addRootAndDirectories(dirs); err != nil {
 		return RepositoryFacts{}, Summary{}, err
 	}
@@ -80,6 +87,8 @@ func scanRepository(root string) (RepositoryFacts, Summary, error) {
 			return RepositoryFacts{}, Summary{}, err
 		}
 	}
+	finishFileFacts()
+	finishParse := adapterMetrics.measure("parsing_extraction")
 	for _, file := range files {
 		if filepath.Ext(file) == ".go" {
 			if err := s.parseGoFile(file); err != nil {
@@ -87,10 +96,14 @@ func scanRepository(root string) (RepositoryFacts, Summary, error) {
 			}
 		}
 	}
+	finishParse()
+	finishResolution := adapterMetrics.measure("semantic_resolution")
 	if err := s.loadSemanticCalls(); err != nil {
 		return RepositoryFacts{}, Summary{}, err
 	}
 	s.addCallEdges()
+	finishResolution()
+	finishMaterialize := adapterMetrics.measure("fact_materialization")
 	for _, node := range s.nodes {
 		s.facts.Nodes = append(s.facts.Nodes, node)
 	}
@@ -99,6 +112,7 @@ func scanRepository(root string) (RepositoryFacts, Summary, error) {
 	}
 	s.summary.Nodes = len(s.facts.Nodes)
 	s.summary.Edges = len(s.facts.Edges)
+	finishMaterialize()
 	return s.facts, s.summary, nil
 }
 

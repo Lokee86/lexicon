@@ -11,6 +11,7 @@ from .discovery import _name_from_dotted, _posix_relative, discover
 from .emission import emit_records, write_records
 from .extraction import DeclarationVisitor
 from .model import Facts
+from .profiling import adapter_profile
 from .resolution import resolve_facts
 
 
@@ -19,7 +20,10 @@ def build_facts(
     changed_files: list[str] | None = None,
     removed_files: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    snapshot = discover(repo)
+    with adapter_profile.measure("discovery_parsing"):
+        snapshot = discover(repo)
+    adapter_profile.set("files_discovered", len(snapshot.contexts))
+    adapter_profile.set("directories_discovered", len(snapshot.directories))
     facts = Facts(repository=snapshot.repository)
     repository_id = facts.add_node(
         "repository",
@@ -77,11 +81,18 @@ def build_facts(
                 candidate_name=context.parse_error,
             )
 
-    for context in snapshot.contexts:
-        if context.tree is not None:
-            DeclarationVisitor(facts, context).visit(context.tree)
-    resolve_facts(facts, snapshot.contexts)
-    return emit_records(facts, __version__, changed_files, removed_files)
+    with adapter_profile.measure("declaration_extraction"):
+        for context in snapshot.contexts:
+            if context.tree is not None:
+                DeclarationVisitor(facts, context).visit(context.tree)
+    with adapter_profile.measure("semantic_resolution"):
+        resolve_facts(facts, snapshot.contexts)
+    adapter_profile.set("files", len(snapshot.contexts))
+    adapter_profile.set("nodes", len(facts.nodes))
+    adapter_profile.set("edges", len(facts.edges))
+    adapter_profile.set("unresolved", len(facts.unresolved))
+    with adapter_profile.measure("fact_materialization"):
+        return emit_records(facts, __version__, changed_files, removed_files)
 
 
 def write_facts(
@@ -90,4 +101,11 @@ def write_facts(
     changed_files: list[str] | None = None,
     removed_files: list[str] | None = None,
 ) -> None:
-    write_records(build_facts(repo, changed_files, removed_files), output)
+    try:
+        records = build_facts(repo, changed_files, removed_files)
+        with adapter_profile.measure("emission"):
+            write_records(records, output)
+        adapter_profile.set("records", len(records))
+        adapter_profile.set("output_bytes", output.stat().st_size)
+    finally:
+        adapter_profile.write()

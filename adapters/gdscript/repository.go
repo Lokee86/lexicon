@@ -30,10 +30,14 @@ func analyzeRepository(repo string, selections ...[]string) ([]byte, error) {
 		return nil, errors.New("repository path is not a directory")
 	}
 
+	finishDiscovery := adapterMetrics.measure("discovery")
 	files, dirs, projectRoots, err := collectSources(root)
+	finishDiscovery()
 	if err != nil {
 		return nil, err
 	}
+	adapterMetrics.set("files_discovered", int64(len(files)))
+	adapterMetrics.set("directories_discovered", int64(len(dirs)))
 	repositoryName := filepath.Base(filepath.Clean(root))
 	facts := &factSet{
 		nodeByID:                   make(map[string]map[string]any),
@@ -49,6 +53,7 @@ func analyzeRepository(repo string, selections ...[]string) ([]byte, error) {
 	addRepositoryFacts(facts, repositoryName, dirs)
 
 	parsed := make([]*parsedFile, 0, len(files))
+	finishParse := adapterMetrics.measure("parsing_extraction")
 	for _, path := range files {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
@@ -68,7 +73,9 @@ func analyzeRepository(repo string, selections ...[]string) ([]byte, error) {
 		addFileFacts(facts, pf, content, dirs)
 		parsed = append(parsed, pf)
 	}
+	finishParse()
 
+	finishRegistry := adapterMetrics.measure("registry_construction")
 	for _, pf := range parsed {
 		processDeclarations(facts, pf)
 	}
@@ -79,11 +86,21 @@ func analyzeRepository(repo string, selections ...[]string) ([]byte, error) {
 		return nil, err
 	}
 	model := buildSemanticModel(facts, parsed)
+	finishRegistry()
+	finishResolution := adapterMetrics.measure("semantic_resolution")
 	for _, pf := range parsed {
 		processImports(facts, pf)
 		processCalls(facts, model, pf)
 	}
-	return facts.render(repositoryName, changedFiles, removedFiles), nil
+	finishResolution()
+	adapterMetrics.set("files", int64(len(parsed)))
+	adapterMetrics.set("nodes", int64(len(facts.nodeByID)))
+	adapterMetrics.set("edges", int64(len(facts.edgeKeys)))
+	adapterMetrics.set("unresolved", int64(len(facts.unresolvedKeys)))
+	finishRender := adapterMetrics.measure("fact_materialization")
+	data := facts.render(repositoryName, changedFiles, removedFiles)
+	finishRender()
+	return data, nil
 }
 
 func addRepositoryFacts(facts *factSet, repositoryName string, dirs []string) {

@@ -10,12 +10,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Lokee86/lexicon/internal/profile"
 )
 
 var ErrNoCurrentSnapshot = errors.New("Lexicon has no current snapshot")
 
 type Store struct {
-	Root string
+	Root    string
+	Profile *profile.Recorder
 }
 
 func (s Store) Publish(manifest Manifest) (string, error) {
@@ -28,8 +31,17 @@ func (s Store) Publish(manifest Manifest) (string, error) {
 		return "", fmt.Errorf("encode Lexicon snapshot: %w", err)
 	}
 	id := digest("lexicon:snapshot:v1\x00", data)
-	if err := writeImmutable(s.snapshotPath(id), append(data, '\n')); err != nil {
+	snapshotData := append(data, '\n')
+	path := s.snapshotPath(id)
+	_, statErr := os.Stat(path)
+	if err := writeImmutable(path, snapshotData); err != nil {
 		return "", err
+	}
+	s.Profile.Add("snapshot_bytes", int64(len(snapshotData)))
+	if statErr == nil {
+		s.Profile.Add("snapshots_reused", 1)
+	} else if os.IsNotExist(statErr) {
+		s.Profile.Add("snapshots_written", 1)
 	}
 	if err := writeAtomic(filepath.Join(s.Root, "CURRENT"), []byte(id+"\n")); err != nil {
 		return "", fmt.Errorf("publish Lexicon snapshot: %w", err)
@@ -88,8 +100,17 @@ func (s Store) WriteObject(object FactObject) (string, error) {
 		return "", fmt.Errorf("encode Lexicon fact object: %w", err)
 	}
 	id := digest("lexicon:fact-object:v1\x00", data)
-	if err := writeImmutable(s.objectPath(id), append(data, '\n')); err != nil {
+	objectData := append(data, '\n')
+	path := s.objectPath(id)
+	_, statErr := os.Stat(path)
+	if err := writeImmutable(path, objectData); err != nil {
 		return "", err
+	}
+	s.Profile.Add("fact_object_bytes", int64(len(objectData)))
+	if statErr == nil {
+		s.Profile.Add("fact_objects_reused", 1)
+	} else if os.IsNotExist(statErr) {
+		s.Profile.Add("fact_objects_written", 1)
 	}
 	return id, nil
 }

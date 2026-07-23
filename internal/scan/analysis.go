@@ -59,35 +59,65 @@ func (s *Scanner) analyzePlan(ctx context.Context, plan analysisPlan, libraryRoo
 			fmt.Fprintf(s.Output, "analyzing %s files: %d\n", plan.Language, len(plan.ChangedFiles))
 		}
 	}
+	mode := analysisMode(plan.Full)
+	finishPrepare := s.Profile.Measure("analysis.prepare_input", plan.Language, mode)
 	request, err := s.analysisRequest(plan, sourceRoot, temporary, adapterOutput)
+	finishPrepare()
 	if err != nil {
 		return err
 	}
-	if err := s.Analyzer.Run(ctx, request); err != nil {
+	_ = os.Remove(request.Profile)
+	finishAdapter := s.Profile.Measure("adapter.run", plan.Language, mode)
+	err = s.Analyzer.Run(ctx, request)
+	finishAdapter()
+	if err != nil {
 		if plan.Full {
 			return err
 		}
 		return s.retryFull(ctx, request, sourceRoot, output, err)
 	}
-	if plan.Full {
-		return replace(adapterOutput, output)
+	if err := s.Profile.MergeAdapter(request.Profile, plan.Language, mode); err != nil {
+		return err
 	}
+	if info, statErr := os.Stat(adapterOutput); statErr == nil {
+		s.Profile.Add("adapter_output_file_bytes", info.Size())
+	}
+	if plan.Full {
+		finishReplace := s.Profile.Measure("library.replace", plan.Language, mode)
+		err = replace(adapterOutput, output)
+		finishReplace()
+		return err
+	}
+	finishDependencyCheck := s.Profile.Measure("analysis.requires_full", plan.Language, mode)
 	fullRequired, err := s.Store.RequiresFullAnalysis(plan.Language, plan.ChangedFiles, adapterOutput)
+	finishDependencyCheck()
 	if err != nil {
 		return err
 	}
 	if fullRequired {
 		return s.retryFull(ctx, request, sourceRoot, output, nil)
 	}
-	if err := library.SetSharedComplete(adapterOutput, false); err != nil {
+	finishShared := s.Profile.Measure("library.mark_partial", plan.Language, mode)
+	err = library.SetSharedComplete(adapterOutput, false)
+	finishShared()
+	if err != nil {
 		return err
 	}
 	merged := filepath.Join(temporary, plan.Language+".merged.jsonl")
 	_ = os.Remove(merged)
-	if err := library.Merge(output, adapterOutput, merged); err != nil {
+	finishMerge := s.Profile.Measure("library.merge_jsonl", plan.Language, mode)
+	err = library.Merge(output, adapterOutput, merged)
+	finishMerge()
+	if err != nil {
 		return err
 	}
-	return replace(merged, output)
+	if info, statErr := os.Stat(merged); statErr == nil {
+		s.Profile.Add("merged_library_bytes", info.Size())
+	}
+	finishReplace := s.Profile.Measure("library.replace", plan.Language, mode)
+	err = replace(merged, output)
+	finishReplace()
+	return err
 }
 
 func (s *Scanner) analysisRequest(plan analysisPlan, sourceRoot, temporary, output string) (adapters.Request, error) {
@@ -99,8 +129,12 @@ func (s *Scanner) analysisRequest(plan analysisPlan, sourceRoot, temporary, outp
 			return adapters.Request{}, err
 		}
 	}
+	profilePath := ""
+	if s.Profile != nil {
+		profilePath = filepath.Join(temporary, plan.Language+".adapter-profile.json")
+	}
 	return adapters.Request{
-		Language: plan.Language, Repository: repository, Output: output,
+		Language: plan.Language, Repository: repository, Output: output, Profile: profilePath,
 		ChangedFiles: plan.ChangedFiles, RemovedFiles: plan.RemovedFiles,
 	}, nil
 }
@@ -113,13 +147,26 @@ func (s *Scanner) retryFull(ctx context.Context, request adapters.Request, sourc
 	request.Repository = sourceRoot
 	request.ChangedFiles = nil
 	request.RemovedFiles = nil
-	if err := s.Analyzer.Run(ctx, request); err != nil {
+	_ = os.Remove(request.Profile)
+	finishAdapter := s.Profile.Measure("adapter.run", request.Language, "full_retry")
+	err := s.Analyzer.Run(ctx, request)
+	finishAdapter()
+	if err != nil {
 		if scopedErr != nil {
 			return fmt.Errorf("scoped %s analysis failed: %v; full retry failed: %w", request.Language, scopedErr, err)
 		}
 		return err
 	}
-	return replace(request.Output, output)
+	if err := s.Profile.MergeAdapter(request.Profile, request.Language, "full_retry"); err != nil {
+		return err
+	}
+	if info, statErr := os.Stat(request.Output); statErr == nil {
+		s.Profile.Add("adapter_output_file_bytes", info.Size())
+	}
+	finishReplace := s.Profile.Measure("library.replace", request.Language, "full_retry")
+	err = replace(request.Output, output)
+	finishReplace()
+	return err
 }
 
 func planLanguages(plans []analysisPlan) []string {

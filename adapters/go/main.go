@@ -32,9 +32,21 @@ func main() {
 		fmt.Fprintf(os.Stderr, "scan failed: %v\n", err)
 		os.Exit(1)
 	}
-	if err := os.WriteFile(*output, []byte(encodeFactsScoped(facts, changedFiles, removedFiles)), 0o644); err != nil {
+	finishEmission := adapterMetrics.measure("emission")
+	encoded := []byte(encodeFactsScoped(facts, changedFiles, removedFiles))
+	if err := os.WriteFile(*output, encoded, 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
 		os.Exit(1)
 	}
+	finishEmission()
+	adapterMetrics.set("output_bytes", int64(len(encoded)))
+	adapterMetrics.set("nodes", int64(summary.Nodes))
+	adapterMetrics.set("edges", int64(summary.Edges))
+	adapterMetrics.set("files", int64(summary.Files))
+	adapterMetrics.set("unresolved", int64(summary.UnresolvedCalls))
 	fmt.Fprintf(os.Stderr, "wrote %s: nodes=%d edges=%d directories=%d files=%d packages=%d imports=%d call_expressions=%d resolved_calls=%d possible_call_targets=%d unresolved_calls=%d builtin_calls=%d conversion_calls=%d external_calls=%d dynamic_calls=%d interface_calls=%d closures=%d captures=%d semantic_errors=%d\n", *output, summary.Nodes, summary.Edges, summary.Directories, summary.Files, summary.Packages, summary.Imports, summary.CallExpressions, summary.DirectCalls, summary.PossibleCallTargets, summary.UnresolvedCalls, summary.BuiltinCalls, summary.ConversionCalls, summary.ExternalCalls, summary.DynamicCalls, summary.InterfaceCalls, summary.Closures, summary.Captures, summary.SemanticErrors)
+	if err := adapterMetrics.write(); err != nil {
+		fmt.Fprintf(os.Stderr, "write adapter profile: %v\n", err)
+		os.Exit(1)
+	}
 }

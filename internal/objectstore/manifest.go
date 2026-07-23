@@ -28,12 +28,14 @@ func (s Store) BuildManifest(stateRoot, stateCommit, analysisConfigID string, ad
 			continue
 		}
 		language := strings.TrimSuffix(entry.Name(), ".jsonl")
+		finishIngest := s.Profile.Measure("objectstore.ingest_language", language, "")
 		languageEntry, err := s.IngestLanguage(
 			filepath.Join(libraryRoot, entry.Name()),
 			filepath.Join(stateRoot, "source"),
 			language,
 			analysisConfigID,
 		)
+		finishIngest()
 		if err != nil {
 			return Manifest{}, fmt.Errorf("ingest %s library: %w", language, err)
 		}

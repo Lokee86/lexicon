@@ -10,17 +10,24 @@ import (
 )
 
 func (s Store) IngestLanguage(outputPath, sourceRoot, language, analysisConfigID string) (LanguageEntry, error) {
+	finishParse := s.Profile.Measure("objectstore.parse_jsonl", language, "")
 	header, records, err := parseOutput(outputPath)
+	finishParse()
 	if err != nil {
 		return LanguageEntry{}, err
 	}
 	if err := validateFullHeader(header, language, outputPath); err != nil {
 		return LanguageEntry{}, err
 	}
+	s.Profile.Add("facts_ingested", int64(len(records)))
+	finishSources := s.Profile.Measure("objectstore.read_sources", language, "")
 	files, err := sourceFiles(sourceRoot, language)
+	finishSources()
 	if err != nil {
 		return LanguageEntry{}, err
 	}
+	s.Profile.Add("source_files_ingested", int64(len(files)))
+	finishGroup := s.Profile.Measure("objectstore.group_facts", language, "")
 	owners := nodeOwners(records)
 	groups := make(map[string][]json.RawMessage)
 	shared := make([]json.RawMessage, 0)
@@ -32,6 +39,7 @@ func (s Store) IngestLanguage(outputPath, sourceRoot, language, analysisConfigID
 			shared = append(shared, record.raw)
 		}
 	}
+	finishGroup()
 	entry := LanguageEntry{
 		Language:         language,
 		AdapterVersion:   header.AdapterVersion,
@@ -41,6 +49,8 @@ func (s Store) IngestLanguage(outputPath, sourceRoot, language, analysisConfigID
 	}
 	paths := sortedMapKeys(files)
 	entry.Files = make([]FileEntry, 0, len(paths))
+	finishObjects := s.Profile.Measure("objectstore.write_fact_objects", language, "")
+	defer finishObjects()
 	for _, path := range paths {
 		contentID := ContentID(files[path])
 		objectID, err := s.WriteObject(FactObject{
@@ -54,7 +64,9 @@ func (s Store) IngestLanguage(outputPath, sourceRoot, language, analysisConfigID
 		entry.Files = append(entry.Files, FileEntry{
 			Path: path, Language: language, ContentID: contentID, ObjectID: objectID,
 		})
+		s.Profile.Add("file_fact_objects", 1)
 	}
+	s.Profile.Add("shared_facts_ingested", int64(len(shared)))
 	if len(shared) > 0 {
 		entry.SharedObjectID, err = s.WriteObject(FactObject{
 			Language: language, AdapterVersion: header.AdapterVersion,
@@ -64,6 +76,7 @@ func (s Store) IngestLanguage(outputPath, sourceRoot, language, analysisConfigID
 		if err != nil {
 			return LanguageEntry{}, err
 		}
+		s.Profile.Add("shared_fact_objects", 1)
 	}
 	return entry, nil
 }

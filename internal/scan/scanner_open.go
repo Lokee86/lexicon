@@ -3,12 +3,14 @@ package scan
 import (
 	"context"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/Lokee86/lexicon/internal/adapters"
 	"github.com/Lokee86/lexicon/internal/config"
 	"github.com/Lokee86/lexicon/internal/lock"
 	"github.com/Lokee86/lexicon/internal/objectstore"
+	"github.com/Lokee86/lexicon/internal/profile"
 	"github.com/Lokee86/lexicon/internal/state"
 )
 
@@ -31,8 +33,16 @@ func initialize(
 	enabledLanguages []string,
 	explicitSelection bool,
 	output io.Writer,
-) (*Scanner, Report, error) {
+) (resultScanner *Scanner, resultReport Report, resultErr error) {
+	metrics := profile.New(os.Getenv("LEXICON_PROFILE"), "init")
+	defer func() {
+		if profileErr := metrics.Write(resultErr); resultErr == nil {
+			resultErr = profileErr
+		}
+	}()
+	finishResolve := metrics.Measure("repository.resolve", "", "")
 	absolute, err := filepath.Abs(repository)
+	finishResolve()
 	if err != nil {
 		return nil, Report{}, err
 	}
@@ -42,43 +52,66 @@ func initialize(
 		return nil, Report{}, err
 	}
 	defer guard.Close()
+	finishConfig := metrics.Measure("config.save", "", "")
 	if explicitSelection {
 		err = config.SaveWithEnabledLanguages(absolute, adapterRoot, enabledLanguages)
 	} else {
 		err = config.Save(absolute, adapterRoot)
 	}
+	finishConfig()
 	if err != nil {
 		return nil, Report{}, err
 	}
 	stateRoot := filepath.Join(lexiconRoot, "repo")
+	finishEnsure := metrics.Measure("state.ensure", "", "")
 	gitRepository, err := state.Ensure(stateRoot)
+	finishEnsure()
 	if err != nil {
 		return nil, Report{}, err
 	}
 	scanner := New(absolute, stateRoot, gitRepository, adapters.Runner{Root: adapterRoot}, output)
+	scanner.Profile = metrics
+	scanner.Store.Profile = metrics
 	configuration, err := config.Load(absolute)
 	if err != nil {
 		return nil, Report{}, err
 	}
 	scanner.EnabledLanguages = configuration.EnabledLanguages
-	if err := scanner.Mirror.SyncAll(absolute); err != nil {
+	finishMirror := metrics.Measure("mirror.sync", "", "full")
+	err = scanner.Mirror.SyncAll(absolute)
+	finishMirror()
+	if err != nil {
 		return nil, Report{}, err
 	}
+	finishLanguages := metrics.Measure("languages.discover", "", "")
 	languages, err := languagesInTree(filepath.Join(stateRoot, "source"))
+	finishLanguages()
 	if err != nil {
 		return nil, Report{}, err
 	}
 	languages = selectedLanguages(languages, scanner.languageEnabled)
-	if _, err := scanner.pruneDisabledLibraries(); err != nil {
+	metrics.Set("languages_discovered", int64(len(languages)))
+	metrics.Set("analysis_plans", int64(len(languages)))
+	metrics.Set("analysis_full_plans", int64(len(languages)))
+	finishPrune := metrics.Measure("library.prune_disabled", "", "")
+	_, err = scanner.pruneDisabledLibraries()
+	finishPrune()
+	if err != nil {
 		return nil, Report{}, err
 	}
 	if err := scanner.analyzeFull(ctx, languages); err != nil {
 		return nil, Report{}, err
 	}
-	if err := gitRepository.StageAll(); err != nil {
+	finishStageAll := metrics.Measure("state.stage_all", "", "")
+	err = gitRepository.StageAll()
+	finishStageAll()
+	if err != nil {
 		return nil, Report{}, err
 	}
-	if err := gitRepository.CommitState(); err != nil {
+	finishCommit := metrics.Measure("state.commit", "", "")
+	err = gitRepository.CommitState()
+	finishCommit()
+	if err != nil {
 		return nil, Report{}, err
 	}
 	snapshotID, err := scanner.publishSnapshot()
@@ -117,6 +150,7 @@ func New(repository, stateRoot string, gitRepository *state.Repository, analyzer
 		Analyzer:    analyzer,
 		Store:       objectstore.Store{Root: config.StateRoot(repository)},
 		Output:      output,
+		ProfilePath: os.Getenv("LEXICON_PROFILE"),
 	}
 }
 

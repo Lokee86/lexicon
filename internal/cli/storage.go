@@ -18,6 +18,7 @@ func runRebuild(ctx context.Context, arguments []string, stdout, stderr io.Write
 	flags.SetOutput(stderr)
 	repository := flags.String("repo", "", "repository to rebuild")
 	languageText := flags.String("languages", "", "comma-separated enabled languages")
+	profilePath := flags.String("profile", "", "write rebuild profile JSON")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -33,6 +34,7 @@ func runRebuild(ctx context.Context, arguments []string, stdout, stderr io.Write
 	if err != nil {
 		return err
 	}
+	scanner.ProfilePath = *profilePath
 	report, err := scanner.Rebuild(ctx, languages)
 	if err != nil {
 		return err

@@ -21,6 +21,12 @@ pub(crate) struct Args {
 }
 
 pub(crate) fn run() -> Result<()> {
+    let result = run_inner();
+    let profile_result = crate::profiling::write();
+    result.and(profile_result)
+}
+
+fn run_inner() -> Result<()> {
     let args = Args::parse();
     let repo = args
         .repo
@@ -35,10 +41,14 @@ pub(crate) fn run() -> Result<()> {
     let removed_files = normalize_paths(args.removed_files);
     let jsonl =
         crate::orchestrator::generate(&repo, changed_files.as_deref(), removed_files.as_deref())?;
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::File::create(&output)?.write_all(jsonl.as_bytes())?;
+    crate::profiling::measure("emission", || -> Result<()> {
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::File::create(&output)?.write_all(jsonl.as_bytes())?;
+        Ok(())
+    })?;
+    crate::profiling::set("output_bytes", jsonl.len());
     Ok(())
 }
 

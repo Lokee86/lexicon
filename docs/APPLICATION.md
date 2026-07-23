@@ -22,10 +22,10 @@ The `lexicon consumer` commands and `internal/consumer` package expose list, add
 ## Commands
 
 ```text
-lexicon init [--repo PATH] [--adapters PATH] [--languages all|LIST]
-lexicon scan [--repo PATH]
+lexicon init [--repo PATH] [--adapters PATH] [--languages all|LIST] [--profile PATH]
+lexicon scan [--repo PATH] [--profile PATH]
 lexicon demon [--repo PATH] [--debounce 150ms] [--reconcile 30s]
-lexicon rebuild [--repo PATH] [--languages LIST]
+lexicon rebuild [--repo PATH] [--languages LIST] [--profile PATH]
 lexicon languages [list] [--repo PATH]
 lexicon languages set [--repo PATH] --languages all|LIST
 lexicon status [--repo PATH]
@@ -50,6 +50,14 @@ lexicon version
 `lexicon status` reports the repository, current snapshot, detected and enabled languages, and consumers. `lexicon doctor` verifies configuration, private Git state, immutable objects, adapter paths, runtime requirements, and consumer commands.
 
 `lexicon export` reconstructs verified standalone JSONL libraries. `lexicon gc` deletes only unreachable snapshots and objects while preserving retention and consumer pins. Consumer commands manage and invoke deterministic post-publication hooks.
+
+## Scan profiling
+
+`init`, `scan`, and `rebuild` accept `--profile PATH`. The same profiling mode can be enabled for scans started through other entry points, including the demon, by setting `LEXICON_PROFILE=PATH`. Profiling is disabled by default and does not change snapshot contents.
+
+The profile is a versioned JSON report containing total duration, operation status, ordered phase durations, and work counts. It records mirror synchronization, change detection, invalidation planning, adapter execution, JSONL merge and replacement, object ingestion, snapshot publication, state commits, and consumer hooks. Adapter subprocesses contribute language-specific discovery, parsing and extraction, semantic resolution, materialization, emission, file/fact counts, and output bytes through a temporary sidecar that Lexicon merges into the operation report. Detailed `adapter.*` phases are nested inside `adapter.run`, and detailed `objectstore.*` phases are nested inside `objectstore.ingest_language`; enclosing and detailed phases should not be summed together.
+
+A profile is replaced after the operation completes. Failed operations still write a report with `status: "error"` and the returned error text. Use separate paths when retaining cold, no-change, and incremental samples.
 
 ## Private state repository
 

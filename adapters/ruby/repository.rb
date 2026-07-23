@@ -17,9 +17,18 @@ module LexiconRuby
       root_directory_id = add_directory(".")
       add_edge(repository_id, root_directory_id, "contains")
 
-      ruby_files.each { |relative_path| scan_file(relative_path) }
-      resolve_superclasses
-      write_facts
+      files = LexiconRuby::Profiling.measure("discovery") { ruby_files }
+      LexiconRuby::Profiling.set("files_discovered", files.length)
+      LexiconRuby::Profiling.measure("parsing_extraction") do
+        files.each { |relative_path| scan_file(relative_path) }
+      end
+      LexiconRuby::Profiling.measure("semantic_resolution") { resolve_superclasses }
+      LexiconRuby::Profiling.set("files", @files.length)
+      LexiconRuby::Profiling.set("nodes", @nodes.length)
+      LexiconRuby::Profiling.set("edges", @edges.length)
+      LexiconRuby::Profiling.set("unresolved", @unresolved.length)
+      LexiconRuby::Profiling.measure("emission") { write_facts }
+      LexiconRuby::Profiling.set("output_bytes", File.size(@output)) if File.file?(@output)
     end
 
     private

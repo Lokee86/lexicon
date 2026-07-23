@@ -10,11 +10,15 @@ import (
 )
 
 func (s *Scanner) ensureSnapshot() (string, error) {
+	finishHead := s.Profile.Measure("snapshot.read_head", "", "")
 	head, err := s.Git.Head()
+	finishHead()
 	if err != nil {
 		return "", err
 	}
+	finishCurrent := s.Profile.Measure("snapshot.load_current", "", "")
 	id, manifest, err := s.Store.Current()
+	finishCurrent()
 	if err == nil && manifest.StateCommit == head {
 		return id, nil
 	}
@@ -22,15 +26,23 @@ func (s *Scanner) ensureSnapshot() (string, error) {
 }
 
 func (s *Scanner) publishSnapshot() (string, error) {
+	finishHead := s.Profile.Measure("snapshot.read_head", "", "")
 	head, err := s.Git.Head()
+	finishHead()
 	if err != nil {
 		return "", err
 	}
+	finishBuild := s.Profile.Measure("snapshot.build_manifest", "", "")
 	manifest, err := s.Store.BuildManifest(s.StateRoot, head, config.AnalysisID(), s.AdapterRoot)
+	finishBuild()
 	if err != nil {
 		return "", err
 	}
-	return s.Store.Publish(manifest)
+	s.Profile.Set("snapshot_languages", int64(len(manifest.Languages)))
+	finishPublish := s.Profile.Measure("snapshot.publish", "", "")
+	id, err := s.Store.Publish(manifest)
+	finishPublish()
+	return id, err
 }
 
 func (s *Scanner) adapterDriftLanguages() ([]string, error) {
