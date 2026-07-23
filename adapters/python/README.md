@@ -65,3 +65,7 @@ The adapter also emits repository, directory, file, module, type, function, meth
 - Parse failures still produce file/module facts plus an unresolved parse record, but no declarations from the failed file.
 
 Python files are scanned deterministically while excluding `.git/`, `.worktrees/`, `.workingtrees/`, `.ddocs/`, `.lexicon/`, `.arcana/`, `.grimoire/`, `.pitlord/`, `.cantrip/`, `.homunculus/`, `.incubus/`, `.ritual/`, `.warlock/`, `.next/`, `__pycache__/`, `.pytest_cache/`, `.bundle/`, `node_modules/`, `target/`, build/dist/virtual-environment directories, and vendor directories.
+
+## Dataflow facts
+
+The adapter emits conservative `reads` and `writes` edges from functions and lambdas to repository-local parameters, locals, class/module values, and resolved attributes. Assignments write, augmented assignments read and write, and initializer, argument, and return expressions contribute reads. Nested scopes and lexical shadowing are preserved. Dynamic attributes, `getattr`/`setattr`, monkey patching, imports, and built-ins are omitted when no sound local target exists.

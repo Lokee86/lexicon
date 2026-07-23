@@ -103,3 +103,7 @@ go test ./...
 ```
 
 The suite covers declarations, imports, exclusions, stable IDs, class/static calls, typed receivers, literal load/preload aliases, nested type aliases and preload-based inheritance, nested Godot project roots, scoped autoloads and lexical shadowing, inheritance, `self`/`super`, expression-boundary receiver parsing, inner classes, anonymous functions, constructor and parameter flow, factory returns, callable and callback-map propagation, contract ordering, and repeat-run determinism.
+
+## Dataflow facts
+
+The adapter emits conservative `reads` and `writes` edges from functions to repository-local parameters, locals, constants, properties, and resolved members. Assignments write, compound assignments read and write, and initializer, argument, and return expressions contribute reads. Lexical shadowing is respected. Dynamic properties, dictionary-style access, engine-provided values, reflection, and unresolved members are omitted rather than guessed.

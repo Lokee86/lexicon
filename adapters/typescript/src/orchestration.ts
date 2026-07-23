@@ -5,6 +5,7 @@ import { createTypeScriptProgram, readPathMappings, scanRepository } from "./dis
 import { emitFacts, writeJsonl } from "./emission";
 import { resolveCalls } from "./call-resolution";
 import { resolveImports, resolveRelationships } from "./resolution";
+import { emitDataflow } from "./dataflow";
 import { FactStore, type Fact } from "./model";
 
 export function buildFacts(repositoryPath: string, changedFiles?: string[], removedFiles?: string[]): Fact[] {
@@ -34,6 +35,7 @@ export function buildFacts(repositoryPath: string, changedFiles?: string[], remo
   for (const context of contexts) extractDeclarations(context, facts);
   resolveImports(facts, readPathMappings(root));
   resolveCalls(facts, checker);
+  emitDataflow(facts, checker);
   resolveRelationships(facts);
   return emitFacts(facts, changedFiles, removedFiles);
 }

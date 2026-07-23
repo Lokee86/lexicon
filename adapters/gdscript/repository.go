@@ -38,6 +38,7 @@ func analyzeRepository(repo string, selections ...[]string) ([]byte, error) {
 	facts := &factSet{
 		nodeByID:                   make(map[string]map[string]any),
 		edgeKeys:                   make(map[string]struct{}),
+		dataflowKeys:               make(map[string]struct{}),
 		unresolvedKeys:             make(map[string]struct{}),
 		moduleByPath:               make(map[string]string),
 		classByName:                make(map[string][]string),
@@ -81,6 +82,7 @@ func analyzeRepository(repo string, selections ...[]string) ([]byte, error) {
 	model := buildSemanticModel(facts, parsed)
 	for _, pf := range parsed {
 		processImports(facts, pf)
+		processDataflow(facts, model, pf)
 		processCalls(facts, model, pf)
 	}
 	return facts.render(repositoryName, changedFiles, removedFiles), nil

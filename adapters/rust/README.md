@@ -45,3 +45,7 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 The semantic fixture suite covers declarations, imports, traits, inherent methods, field aliases, constructor-like calls, UFCS, local macros, callbacks, generic trait dispatch, canonical ordering, relative paths, unresolved classifications, and byte-identical repeat runs.
+
+## Dataflow facts
+
+The adapter emits conservative `reads` and `writes` edges from functions and closures to repository-local parameters, locals, constants/statics, and resolved fields. Assignments write, compound assignments read and write, and initializer, argument, and return expressions contribute reads. Block shadowing is respected. Rust has no increment/decrement operators. Deref/alias analysis, unsafe mutation, external values, macro-generated bodies that are not parsed, and unresolved receiver fields are omitted rather than guessed.

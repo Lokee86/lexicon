@@ -49,3 +49,7 @@ The SHA-256 payload defined by the shared contract uses these Go identity string
 | captured variable | `variable:<module>:<file>:<line>:<column>:<name>` |
 
 Compiler-generated wrappers and external closures use deterministic `ssa-function:` identities. Synthetic built-in and type-expression nodes use stable language namespaces such as `go:builtins` and `go:types`. Absolute checkout paths are never part of an identity.
+
+## Dataflow facts
+
+The adapter emits conservative `reads` and `writes` edges from the containing callable to repository-local parameters, variables, constants, and fields. Assignments write, compound assignments and increment/decrement read and write, and initializer, argument, and return expressions contribute reads. Lexical shadowing is respected. Unresolved selectors, built-ins, external package values, reflection, and unsafe aliasing are omitted rather than guessed.

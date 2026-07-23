@@ -4,6 +4,7 @@ mod call_support;
 mod cli;
 mod contract;
 mod declarations;
+mod dataflow;
 mod discovery;
 mod emit;
 mod expr_eval;

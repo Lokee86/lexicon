@@ -90,3 +90,7 @@ npm test
 ```
 
 The suite covers TypeScript semantics, JavaScript ESM, JSX, CommonJS, JSDoc flow, Svelte script extraction and module resolution, path mappings, exclusions, stable IDs, deterministic repeat runs, and the shared JSONL validator.
+
+## Dataflow facts
+
+The TypeScript adapter, including JavaScript and Svelte script blocks, emits conservative `reads` and `writes` edges from callables to repository-local parameters, variables, constants, and resolved class fields. Assignments write, compound/update expressions read and write, and initializer, argument, and return expressions contribute reads. Destructured bindings and lexical shadowing are tracked. Dynamic properties, computed members without a sound target, globals, framework runtime injection, and external values are omitted.

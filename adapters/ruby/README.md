@@ -64,3 +64,7 @@ File content IDs are SHA-256 identities of the original bytes. Node IDs use the 
 ```sh
 ruby adapters/ruby/test/test_adapter.rb
 ```
+
+## Dataflow facts
+
+The adapter emits conservative `reads` and `writes` edges from methods and blocks to repository-local parameters, locals, constants, instance variables, and resolved fields. Assignments write, compound updates read and write, and initializer, argument, and return expressions contribute reads. Scope shadowing is preserved. Metaprogramming, dynamic sends, open-class mutation, external constants, and unresolved accessors are omitted rather than guessed.

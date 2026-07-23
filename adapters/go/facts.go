@@ -23,6 +23,9 @@ const (
 	KindFunction   NodeKind = "function"
 	KindMethod     NodeKind = "method"
 	KindVariable   NodeKind = "variable"
+	KindField      NodeKind = "field"
+	KindConstant   NodeKind = "constant"
+	KindParameter  NodeKind = "parameter"
 	KindTest       NodeKind = "test"
 )
 
@@ -38,6 +41,8 @@ const (
 	RelImplements    RelationKind = "implements"
 	RelExtends       RelationKind = "extends"
 	RelReferences    RelationKind = "references"
+	RelReads         RelationKind = "reads"
+	RelWrites        RelationKind = "writes"
 )
 
 type NodeKey string
