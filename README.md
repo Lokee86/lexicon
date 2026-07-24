@@ -1,5 +1,7 @@
 # Lexicon
 
+> **Repository moved:** Lexicon's canonical source and active development now live at [`github.com/Lokee86/grimoire/lexicon`](https://github.com/Lokee86/grimoire/tree/main/lexicon). This repository is retained as a migration pointer and historical source. Lexicon remains an independently buildable application and reusable language-analysis engine inside the Grimoire monorepo.
+
 Lexicon is the shared language-analysis engine for the Warlock toolchain. It turns source repositories into deterministic, versioned facts about files, symbols, calls, dataflow, inheritance, dependencies, and unresolved relationships.
 
 Lexicon is primarily a one-shot CLI application. It can also run an optional filesystem watch mode through `lexicon demon`, but consumers do not depend on a resident Lexicon process.
@@ -149,9 +151,9 @@ python evaluation/run_validation.py --jobs 3
 
 Detailed prerequisites, focused commands, race checks, validation rules, and documentation requirements are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Warlock toolchain
+## Grimoire and the Warlock toolchain
 
-Lexicon is independently usable, but it is designed as the shared semantic-analysis foundation for Warlock tools. Arcana consumes Lexicon snapshots to build queryable graphs; other tools can consume the same facts without maintaining duplicate language adapters.
+Lexicon is independently usable, but its canonical source now shares the Grimoire repository with Arcana and the context engine. Arcana consumes Lexicon snapshots to build queryable graphs; Grimoire Context and other Warlock tools can consume the same facts without maintaining duplicate language adapters. Repository consolidation does not make Lexicon depend on either downstream component.
 
 ## License
 
