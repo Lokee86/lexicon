@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"regexp"
 	"sort"
@@ -64,6 +65,5 @@ func testSpanKey(record map[string]any) string {
 	if value == nil {
 		return ""
 	}
-	encoded, _ := json.Marshal([]any{value["path"], value["start_line"], value["start_column"], value["end_line"], value["end_column"]})
-	return string(encoded)
+	return fmt.Sprintf("%s\x00%09.0f\x00%09.0f\x00%09.0f\x00%09.0f", value["path"], value["start_line"], value["start_column"], value["end_line"], value["end_column"])
 }

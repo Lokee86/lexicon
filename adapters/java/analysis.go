@@ -47,6 +47,9 @@ func analyzeRepository(repository string) ([]byte, error) {
 		fields: make(map[string]map[string][]fieldDeclaration), repositoryID: repositoryID,
 		types: make(map[string][]typeDeclaration),
 	}
+	for _, manifest := range snapshot.manifests {
+		analyzeDependencyManifest(state, directoryIDs, manifest)
+	}
 	for _, source := range snapshot.sources {
 		fileID := facts.addNode("file", filepath.Base(filepath.FromSlash(source.path)), source.path, source.path, source.path, source.path, nil, nil, contentID(source.content))
 		facts.addEdge(parentContainer(repositoryID, directoryIDs, source.path), fileID, "contains", source.path, nil, nil)

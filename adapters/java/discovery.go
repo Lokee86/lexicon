@@ -28,8 +28,16 @@ type repositorySource struct {
 	valid    bool
 }
 
+type repositoryManifest struct {
+	content []byte
+	kind    string
+	path    string
+	valid   bool
+}
+
 type repositorySnapshot struct {
 	directories []string
+	manifests   []repositoryManifest
 	name        string
 	root        string
 	sources     []repositorySource
@@ -71,7 +79,8 @@ func discoverRepository(repository string) (repositorySnapshot, error) {
 			snapshot.directories = append(snapshot.directories, relative)
 			return nil
 		}
-		if strings.ToLower(filepath.Ext(entry.Name())) != ".java" {
+		manifestKind := manifestKind(entry.Name())
+		if strings.ToLower(filepath.Ext(entry.Name())) != ".java" && manifestKind == "" {
 			return nil
 		}
 		content, err := os.ReadFile(path)
@@ -82,11 +91,18 @@ func discoverRepository(repository string) (repositorySnapshot, error) {
 		if err != nil {
 			return err
 		}
+		valid := utf8.Valid(content) && !bytes.ContainsRune(content, '\x00')
+		if manifestKind != "" {
+			snapshot.manifests = append(snapshot.manifests, repositoryManifest{
+				content: content, kind: manifestKind, path: relative, valid: valid,
+			})
+			return nil
+		}
 		snapshot.sources = append(snapshot.sources, repositorySource{
 			absolute: path,
 			content:  content,
 			path:     relative,
-			valid:    utf8.Valid(content) && !bytes.ContainsRune(content, '\x00'),
+			valid:    valid,
 		})
 		return nil
 	})
@@ -97,7 +113,23 @@ func discoverRepository(repository string) (repositorySnapshot, error) {
 	sort.Slice(snapshot.sources, func(left, right int) bool {
 		return snapshot.sources[left].path < snapshot.sources[right].path
 	})
+	sort.Slice(snapshot.manifests, func(left, right int) bool {
+		return snapshot.manifests[left].path < snapshot.manifests[right].path
+	})
 	return snapshot, nil
+}
+
+func manifestKind(name string) string {
+	switch name {
+	case "pom.xml":
+		return "maven"
+	case "build.gradle":
+		return "gradle-groovy"
+	case "build.gradle.kts":
+		return "gradle-kotlin"
+	default:
+		return ""
+	}
 }
 
 func normalizedRelative(root, absolute string) (string, error) {
