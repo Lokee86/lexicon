@@ -15,7 +15,7 @@ Dependency edge attributes are deterministic and always use these scalar fields:
 - `source`: the normalized manifest section or literal loader/source text;
 - `optional`, `dev`, `build`, `peer`, and `path`: boolean classification flags.
 
-The parsers read manifest text or JSON/TOML data only. They never execute manifests, resolve packages by installing them, or evaluate dynamic expressions. Malformed, computed, URL/VCS, and otherwise non-literal entries are omitted unless an adapter's existing import analysis already emits its normal unresolved classification. Ordering follows facts-v1 node/edge ordering and all repeated runs are byte-identical.
+The parsers read manifest text or JSON/TOML data only. They never execute manifests, resolve packages by installing them, or evaluate dynamic expressions. A dedicated adapter may preserve malformed, computed, catalog-backed, interpolated, or otherwise unsupported declarations as unresolved `depends-on` evidence, but it must not emit a proven dependency edge for them. Ordering follows facts-v1 node/edge ordering and all repeated runs are byte-identical.
 
 ## Adapter coverage
 
@@ -25,5 +25,7 @@ The parsers read manifest text or JSON/TOML data only. They never execute manife
 - TypeScript/JavaScript/Svelte: `package.json` runtime/dev/peer/optional sections, `file:`/`link:` paths, relative imports, and unique `tsconfig`/`jsconfig` path-mapped imports.
 - GDScript/Godot: enabled editor plugins, autoload entries, explicit `res://` resource/script paths in `project.godot`, and literal local `preload`/`load` references.
 - Rust: Cargo normal/development/build/target/path dependencies through Cargo metadata, plus resolved local Rust module imports.
+- Java: literal direct Maven dependencies and literal Gradle Groovy/Kotlin dependency declarations for the supported configurations; properties, catalogs, project dependencies, platforms, profiles, dependency management, and build evaluation remain unresolved.
+- Kotlin: literal Gradle Kotlin/Groovy and direct Maven dependencies, including Kotlin-oriented `kapt` and `ksp` configurations; catalogs, interpolation, project dependencies, platform wrappers, source-set construction, and build evaluation remain unresolved.
 
 Unsupported forms include dynamic manifest construction, dependency execution, unresolved package-manager aliases, non-literal Ruby dependency calls, computed Godot paths, and unresolved Rust/Cargo metadata entries. These are not treated as proven dependency edges.

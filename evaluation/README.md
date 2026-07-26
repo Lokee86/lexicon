@@ -53,6 +53,8 @@ python evaluation/compare_jsonl.py LEFT.jsonl RIGHT.jsonl
 
 The Go adapter has a separate dated two-repository record in [`docs/GO_ADAPTER_VALIDATION.md`](../docs/GO_ADAPTER_VALIDATION.md). Go application and adapter tests remain part of `run_tests.py`.
 
+Java and Kotlin currently enter the canonical test matrix through their permanent structural, relationship, runtime-semantics, dependency-manifest, contract, race, and byte-determinism fixtures. A pinned real-repository JVM corpus has not yet been accepted, so the current JVM validation record does not make corpus-level precision or recall claims.
+
 Calibration cases are used to understand and tune language-general behavior. Validation cases protect known realistic behavior. Holdouts provide a separate check against overfitting to calibration repositories.
 
 The C# corpus forces restored MSBuild project loading and exercises Roslyn-backed extraction across application, library, and policy-oriented code. Spectre covers calibration of calls, dataflow, dependencies, inheritance, and interface implementation; Dapper protects the validation path for calls, dataflow, and dependencies; Polly is an independent holdout for the same broad relation surface.

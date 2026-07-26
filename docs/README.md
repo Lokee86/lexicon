@@ -29,6 +29,7 @@ Lexicon documentation follows these rules:
 | [SEMANTIC_CORPUS_VALIDATION.md](SEMANTIC_CORPUS_VALIDATION.md) | Dated real-repository validation record for the non-Go adapter corpus |
 | [GO_ADAPTER_VALIDATION.md](GO_ADAPTER_VALIDATION.md) | Dated Go semantic-adapter validation record and its measured limits |
 | [CSHARP_ADAPTER_VALIDATION.md](CSHARP_ADAPTER_VALIDATION.md) | Dated C# semantic-adapter calibration and validation record |
+| [JVM_ADAPTER_VALIDATION.md](JVM_ADAPTER_VALIDATION.md) | Dated Java and Kotlin fixture, contract, determinism, and boundary validation record |
 | [RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) | Distribution layout, build requirements, runtime requirements, and packaging command |
 
 ## Related documentation
