@@ -1,6 +1,6 @@
 # Kotlin adapter
 
-The Kotlin adapter is a self-contained Go executable that reads Kotlin source text and emits the Lexicon facts-v1 JSONL contract. It uses a deterministic, non-executing structural lexer and parser: it does not run application code, Gradle, Kotlin scripts, compiler plugins, annotation processors, or repository build logic.
+The Kotlin adapter is a self-contained Go executable that reads Kotlin source text and supported Gradle/Maven manifests and emits the Lexicon facts-v1 JSONL contract. It uses deterministic, non-executing parsers: it does not run application code, Gradle, Maven, Kotlin scripts, compiler plugins, annotation processors, dependency resolution, or repository build logic.
 
 ## Build
 
@@ -52,6 +52,9 @@ The foundation emits:
 - `contains` and `defines` ownership edges for declarations and parameters;
 - annotation spellings and sorted Kotlin modifiers when present;
 - `suspend`, extension receiver, declared type, return type, default-parameter, mutability, and nullability metadata where syntactically available;
+- literal supported Gradle Kotlin/Groovy dependencies, including `kapt` and `ksp`, plus direct literal Maven dependencies;
+- deterministic external Maven-ecosystem module nodes and `depends-on` edges with manifest, configuration, coordinate, scope/optional, and source-span evidence;
+- unresolved `depends-on` evidence for catalogs, interpolation, project dependencies, platform wrappers, properties, parent/profile/BOM/plugin-derived forms, and other declarations that cannot be proven without executing or resolving the build;
 - explicit `unresolved` records with relation `defines`, reason `unsupported-form`, and parser diagnostics for malformed delimiters, malformed declarations, unsupported destructuring properties, unterminated literals/comments, and other declaration syntax the structural parser cannot interpret safely.
 
 Enum entries, property accessors, local declarations, and initializer/body expressions are not emitted as declarations. Their text is skipped without execution.
@@ -92,7 +95,7 @@ Duplicate malformed declarations that have the same canonical source identity re
 
 ## Discovery and permanent exclusions
 
-Discovery recursively scans regular `.kt` and `.kts` files. Paths are normalized to repository-relative forward-slash form and sorted before parsing. Symlinks are not followed.
+Discovery recursively scans regular `.kt`, `.kts`, `build.gradle.kts`, `build.gradle`, and `pom.xml` files. Paths are normalized to repository-relative forward-slash form and sorted before parsing. Symlinks are not followed.
 
 The following directory names are permanently excluded case-insensitively:
 
@@ -120,7 +123,7 @@ cd adapters/kotlin
 go test -race ./...
 ```
 
-The permanent foundation fixture covers package/import evidence, declarations, parameters, nullability, exclusions, malformed syntax, valid edge endpoints, repository-relative paths, CLI behavior, canonical IDs, and byte determinism. The focused relationship fixture covers exact, same-package, explicit-import, alias, aliased-nested, wildcard, and lexical-nested resolution; class and interface headers; delegation metadata; local annotation applications; ambiguous and external evidence; valid endpoints; and repeated full-stream byte determinism. The runtime fixture covers retained body/delegation ranges, top-level/member/object/companion/constructor calls, overload candidates, external/dynamic/unsupported calls, direct-super overrides, property/parameter reads, property writes, local/destructured/delegated exclusions, valid endpoints, and repeated byte determinism.
+The permanent foundation fixture covers package/import evidence, declarations, parameters, nullability, exclusions, malformed syntax, valid edge endpoints, repository-relative paths, CLI behavior, canonical IDs, and byte determinism. The focused relationship fixture covers exact, same-package, explicit-import, alias, aliased-nested, wildcard, and lexical-nested resolution; class and interface headers; delegation metadata; local annotation applications; ambiguous and external evidence; valid endpoints; and repeated full-stream byte determinism. The runtime fixture covers retained body/delegation ranges, top-level/member/object/companion/constructor calls, overload candidates, external/dynamic/unsupported calls, direct-super overrides, property/parameter reads, property writes, local/destructured/delegated exclusions, valid endpoints, and repeated byte determinism. The dependency fixture covers Gradle Kotlin/Groovy, Maven, `kapt`/`ksp`, duplicates, unsupported computed forms, permanent exclusions, manifest evidence, valid endpoints, and repeated byte determinism.
 
 ## Current boundaries
 
@@ -130,8 +133,8 @@ This foundation is syntax-structural rather than compiler-semantic. It deliberat
 - invoke the Kotlin compiler or resolve targets from libraries, generated code, default imports, type aliases, expression types, or build configuration;
 - perform compiler overload resolution, default-argument matching, generic-call parsing, inherited or virtual dispatch, imported/extension-call binding, safe-call resolution, callable-value flow, or primary-constructor supertype-invocation analysis;
 - infer reads or writes for locals, destructured/delegated symbols, arbitrary value receivers, accessors, initializers, aliases, or nested executable scopes;
-- infer dependency manifests, delegated-property semantics, or delegation behavior beyond retaining a declared supertype delegation expression and explicit secondary-constructor `this(...)`/`super(...)` calls;
+- resolve computed, catalog-backed, interpolated, project, platform, parent/profile/BOM, plugin-generated, transitive, or installed dependency semantics; infer delegated-property behavior; or infer delegation behavior beyond retaining a declared supertype delegation expression and explicit secondary-constructor `this(...)`/`super(...)` calls;
 - model enum entries, type parameters, local declarations, accessors, contracts, annotation arguments/use-site behavior, annotations as separate application nodes, or generated declarations;
 - recover an unsafe declaration by guessing its name or shape.
 
-Imports retain source evidence but target deterministic external syntactic symbols; they are not claims of successful compiler resolution. The relationship pass uses imports only to identify repository-local type and annotation-class targets; the runtime pass uses type imports only while resolving explicit type/object/companion owners and constructors, never to bind imported top-level or extension functions. External and ambiguous relationship targets remain unresolved. Runtime ambiguity becomes `possible-calls` only after ownership is proven; otherwise external, dynamic, ambiguous-owner, unsupported, or malformed evidence stays unresolved. These boundaries keep the adapter safe and deterministic while leaving compiler-backed resolution, broader runtime/dataflow analysis, and dependency surfaces for later slices.
+Imports retain source evidence but target deterministic external syntactic symbols; they are not claims of successful compiler resolution. The relationship pass uses imports only to identify repository-local type and annotation-class targets; the runtime pass uses type imports only while resolving explicit type/object/companion owners and constructors, never to bind imported top-level or extension functions. External and ambiguous relationship targets remain unresolved. Runtime ambiguity becomes `possible-calls` only after ownership is proven; otherwise external, dynamic, ambiguous-owner, unsupported, or malformed evidence stays unresolved. These boundaries keep the adapter safe and deterministic while leaving compiler-backed resolution, broader runtime/dataflow analysis, and effective build-model resolution for later slices.

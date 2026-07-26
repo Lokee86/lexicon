@@ -1,6 +1,6 @@
 # Java adapter
 
-The Java adapter is a self-contained Go executable that reads Java source as data and emits the Lexicon facts-v1 JSONL contract. It does not load classes, invoke build tools, evaluate manifests, run annotation processors, or execute analyzed project code.
+The Java adapter is a self-contained Go executable that reads Java source and supported Maven/Gradle manifests as data and emits the Lexicon facts-v1 JSONL contract. It does not load classes, invoke build tools, evaluate build logic, run annotation processors, resolve installed dependencies, or execute analyzed project code.
 
 ## Build
 
@@ -45,7 +45,10 @@ The foundation models:
 - `possible-calls` edges for the repository-local overloads that remain when name/arity lookup has multiple sound targets;
 - conservative direct-parent `overrides` edges for methods with identical declared names and normalized parameter signatures;
 - simple modeled field and parameter `reads`/`writes`, including assignment and increment/decrement writes;
-- explicit unresolved relationship, `imports`, `defines`, `calls`, `reads`, or `writes` evidence rather than guessed targets.
+- literal direct Maven dependency coordinates from `pom.xml`, including version, scope, and optional metadata;
+- literal supported Gradle Groovy/Kotlin dependency declarations, with configuration and source-span evidence;
+- deterministic external dependency modules and `depends-on` edges, while computed, catalog-backed, project, platform, profile, dependency-management, plugin, and other unsupported forms remain unresolved;
+- explicit unresolved relationship, `imports`, `defines`, `calls`, `reads`, `writes`, or `depends-on` evidence rather than guessed targets.
 
 Classes, enums, and records use the common `type` node kind. Interfaces and annotation declarations use `interface`. Their exact Java surface is retained in `attributes.declaration_kind`. Record components use `field` with `declaration_kind: record-component`. Parameters preserve source order through their index and parent callable identity.
 
@@ -85,13 +88,13 @@ Content IDs hash the unmodified file bytes. Absolute checkout paths never enter 
 
 ## Discovery and permanent exclusions
 
-Discovery walks deterministically without following directory symlinks and reads only `.java` files. Directory and source lists are sorted before analysis. Matching is case-insensitive for the permanent excluded directory names.
+Discovery walks deterministically without following directory symlinks and reads `.java`, `pom.xml`, `build.gradle`, and `build.gradle.kts` files. Directory, source, and manifest lists are sorted before analysis. Matching is case-insensitive for the permanent excluded directory names.
 
 The adapter excludes Git/worktree metadata (`.git`, `.worktrees`, `.workingtrees`), Lexicon and Warlock state (`.ddocs`, `.lexicon`, `.arcana`, `.grimoire`, `.pitlord`, `.cantrip`, `.homunculus`, `.incubus`, `.ritual`, `.warlock`), dependency/cache trees (`.bundle`, `.cache`, `.gradle`, `.idea`, `.mvn`, `.next`, `node_modules`, `packages`, `vendor`), and build/output trees (`bin`, `build`, `coverage`, `dist`, `generated`, `generated-sources`, `obj`, `out`, `target`, `temp`, `tmp`).
 
 ## Current boundaries
 
-This adapter uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model implicit or transitive inheritance, virtual dispatch, argument-type overload selection, inherited unqualified calls, instance-receiver method resolution, statically imported call targets, implicit/default constructors, initializer-body semantics, module descriptors, local/anonymous classes, lambda ownership, local-variable nodes, alias/control-flow dataflow, build dependency manifests, classpath resolution, generated sources, or incremental scope. It does not execute a compiler or infer targets from same-named declarations outside the explicitly supported lookups. Override evidence does not apply generic substitution, module accessibility, visibility beyond explicit modifiers and same-package declarations, bridge methods, covariant-return analysis, or transitive ancestry. Reads/writes do not claim array-element, chained-expression, reflective, alias, or interprocedural ownership. Annotation values, target legality, repeatable expansion, inherited annotations, and type-use placement are not semantically interpreted.
+This adapter uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model implicit or transitive inheritance, virtual dispatch, argument-type overload selection, inherited unqualified calls, instance-receiver method resolution, statically imported call targets, implicit/default constructors, initializer-body semantics, module descriptors, local/anonymous classes, lambda ownership, local-variable nodes, alias/control-flow dataflow, effective Maven models, Gradle build models, property/profile/BOM/version-catalog resolution, project or platform dependencies, transitive dependencies, classpath resolution, generated sources, or incremental scope. It does not execute a compiler or infer targets from same-named declarations outside the explicitly supported lookups. Override evidence does not apply generic substitution, module accessibility, visibility beyond explicit modifiers and same-package declarations, bridge methods, covariant-return analysis, or transitive ancestry. Reads/writes do not claim array-element, chained-expression, reflective, alias, or interprocedural ownership. Annotation values, target legality, repeatable expansion, inherited annotations, and type-use placement are not semantically interpreted.
 
 Malformed literals/comments, unclosed type/member bodies, malformed package/import syntax, and member forms that cannot be classified safely remain explicit `unsupported-form` unresolved records. Valid declarations already isolated before a later malformed region may still be emitted; the unresolved record preserves the unsupported boundary. Invalid UTF-8 or NUL-containing files retain file/module evidence and emit an unresolved `defines` record.
 
@@ -101,7 +104,7 @@ Malformed literals/comments, unclosed type/member bodies, malformed package/impo
 go -C adapters/java test ./...
 ```
 
-The permanent fixtures cover packages, local and external imports, static imports, every modeled type form, ordinary and compact constructors, methods, multi-field declarations, record components, parameters, nested types, malformed syntax, permanent exclusions, declared inheritance and implementation, sealed permits, local and external annotations, exact/package/explicit/wildcard/lexical resolution, definite and possible calls, external and dynamic call evidence, constructor calls, direct overrides, field/parameter reads and writes, local shadowing, retained body ranges, ambiguous targets, valid endpoints, canonical identities and ordering, byte determinism, checkout-path independence, stdout, and file output. A generated stream can also be checked with:
+The permanent fixtures cover packages, local and external imports, static imports, every modeled type form, ordinary and compact constructors, methods, multi-field declarations, record components, parameters, nested types, malformed syntax, permanent exclusions, declared inheritance and implementation, sealed permits, local and external annotations, exact/package/explicit/wildcard/lexical resolution, definite and possible calls, external and dynamic call evidence, constructor calls, direct overrides, field/parameter reads and writes, local shadowing, retained body ranges, literal Maven and Gradle dependencies, duplicate dependency evidence, unsupported computed dependency forms, manifest exclusions, ambiguous targets, valid endpoints, canonical identities and ordering, byte determinism, checkout-path independence, stdout, and file output. A generated stream can also be checked with:
 
 ```text
 python tools/validate_jsonl.py /path/to/facts.jsonl

@@ -41,6 +41,14 @@ python tools/validate_jsonl.py <facts.jsonl>
 python tools/semantic_report.py <facts.jsonl>
 ```
 
+## Accepted July 26 run
+
+The merged `main` branch passed the full `evaluation/run_tests.py` matrix: the Lexicon application plus Go, GDScript, generic, Java, Kotlin, Python, Ruby, C#, TypeScript, and Rust adapters. Java and Kotlin also passed their focused race-enabled suites after runtime semantics and dependency manifests were consolidated.
+
+The release packager completed successfully and produced `adapters/java/lexicon-java.exe` and `adapters/kotlin/lexicon-kotlin.exe`. Those packaged executables analyzed their complete permanent fixture trees, emitted 243,409-byte Java and 311,430-byte Kotlin streams, and both streams passed `tools/validate_jsonl.py`.
+
+Every Java and Kotlin Go source file remained below the 300-line repository limit. The largest Java file was 278 lines; the largest Kotlin file was 294 lines.
+
 ## Evidence boundary
 
 The adapters use conservative source parsers and repository-local resolution rather than javac or the Kotlin compiler. A definite edge requires a unique target under the explicitly modeled lookup rules. Multiple sound local candidates become `possible-calls`; missing, external, dynamically typed, build-generated, or unsupported targets remain unresolved.
