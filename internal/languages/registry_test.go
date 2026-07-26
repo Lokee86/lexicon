@@ -7,9 +7,15 @@ import (
 
 func TestDedicatedAdaptersTakePrecedence(t *testing.T) {
 	for path, want := range map[string][]string{
-		"src/App.svelte": {"typescript"},
-		"src/main.go":    {"go"},
-		"src/main.py":    {"python"},
+		"src/App.svelte":              {"typescript"},
+		"src/App.sln":                 {"csharp"},
+		"src/App.csproj":              {"csharp"},
+		"src/Directory.Build.props":   {"csharp"},
+		"src/Directory.Build.targets": {"csharp"},
+		"src/global.json":             {"csharp"},
+		"src/main.cs":                 {"csharp"},
+		"src/main.go":                 {"go"},
+		"src/main.py":                 {"python"},
 	} {
 		if got := ForPath(path); !reflect.DeepEqual(got, want) {
 			t.Fatalf("ForPath(%s) = %v, want %v", path, got, want)
@@ -35,6 +41,9 @@ func TestGenericFallbackExcludesNonSourceFiles(t *testing.T) {
 		if got := ForPath(path); got != nil {
 			t.Fatalf("ForPath(%s) = %v, want nil", path, got)
 		}
+	}
+	if !OwnsSource("csharp", "src/main.cs") || OwnsSource("generic-cs", "src/main.cs") {
+		t.Fatal("C# source ownership is not dedicated")
 	}
 	if IsGeneric("generic-md") || IsGeneric("generic") {
 		t.Fatal("unsupported generic identities must be rejected")

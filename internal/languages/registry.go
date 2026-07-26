@@ -18,6 +18,7 @@ const genericLanguagePrefix = "generic-"
 var definitions = []Definition{
 	{Language: "gdscript", Directory: "gdscript", Extensions: []string{".gd"}, ConfigFiles: []string{"project.godot"}},
 	{Language: "go", Directory: "go", Extensions: []string{".go"}, ConfigFiles: []string{"go.mod", "go.sum"}},
+	{Language: "csharp", Directory: "csharp", Extensions: []string{".cs"}, ConfigFiles: []string{".sln", ".csproj", "Directory.Build.props", "Directory.Build.targets", "global.json"}},
 	{Language: "python", Directory: "python", Extensions: []string{".py"}, ConfigFiles: []string{"pyproject.toml", "setup.cfg", "requirements.txt"}},
 	{Language: "ruby", Directory: "ruby", Extensions: []string{".rb", ".gemspec"}, ConfigFiles: []string{"Gemfile", "Gemfile.lock"}},
 	{Language: "rust", Directory: "rust", Extensions: []string{".rs"}, ConfigFiles: []string{"Cargo.toml", "Cargo.lock"}},
@@ -27,7 +28,7 @@ var definitions = []Definition{
 
 var genericSourceExtensions = map[string]struct{}{
 	".asm": {}, ".bash": {}, ".bat": {}, ".c": {}, ".cc": {}, ".clj": {}, ".cljs": {},
-	".cmd": {}, ".cpp": {}, ".cr": {}, ".cs": {}, ".dart": {}, ".elm": {}, ".erl": {},
+	".cmd": {}, ".cpp": {}, ".cr": {}, ".dart": {}, ".elm": {}, ".erl": {},
 	".ex": {}, ".exs": {}, ".f03": {}, ".f90": {}, ".f95": {}, ".fish": {}, ".fs": {},
 	".fsx": {}, ".groovy": {}, ".h": {}, ".hh": {}, ".hpp": {}, ".hs": {}, ".java": {},
 	".jl": {}, ".kt": {}, ".kts": {}, ".lhs": {}, ".lua": {}, ".m": {}, ".ml": {},
@@ -74,7 +75,7 @@ func ForPath(path string) []string {
 		if definition.Language == "generic" {
 			continue
 		}
-		if contains(definition.ConfigFiles, name) || contains(definition.Extensions, extension) {
+		if matchesConfigFile(definition.ConfigFiles, name, extension) || contains(definition.Extensions, extension) {
 			result = append(result, definition.Language)
 		}
 	}
@@ -126,6 +127,15 @@ func clone(definition Definition) Definition {
 func contains(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesConfigFile(configFiles []string, name, extension string) bool {
+	for _, configFile := range configFiles {
+		if configFile == name || (strings.HasPrefix(configFile, ".") && configFile == extension) {
 			return true
 		}
 	}

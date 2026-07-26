@@ -11,7 +11,7 @@ import (
 )
 
 func TestCommandPrefersPackagedExecutables(t *testing.T) {
-	for _, language := range []string{"go", "gdscript", "rust"} {
+	for _, language := range []string{"go", "gdscript", "rust", "csharp"} {
 		t.Run(language, func(t *testing.T) {
 			root := t.TempDir()
 			executable := filepath.Join(root, language, "lexicon-"+language)
@@ -40,6 +40,32 @@ func TestCommandPrefersPackagedExecutables(t *testing.T) {
 				t.Fatalf("packaged command arguments = %#v", got)
 			}
 		})
+	}
+}
+
+func TestCommandUsesDotnetForDevelopmentCSharpAdapter(t *testing.T) {
+	root := t.TempDir()
+	dotnet := filepath.Join(root, "dotnet")
+	if runtime.GOOS == "windows" {
+		dotnet += ".exe"
+	}
+	if err := os.WriteFile(dotnet, []byte("fake dotnet"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	request := Request{Language: "csharp", Repository: "repo", Output: "facts.jsonl", ChangedFiles: []string{"src/main.cs"}}
+	command, err := (Runner{Root: root}).command(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(root, "csharp", "Lexicon.CSharp.csproj")
+	if command.Path != dotnet {
+		t.Fatalf("command path = %q, want dotnet executable %q", command.Path, dotnet)
+	}
+	want := []string{"run", "--project", project, "--", "--repo", "repo", "--output", "facts.jsonl", "--changed-file", "src/main.cs"}
+	if got := command.Args[1:]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("C# development command arguments = %#v, want %#v", got, want)
 	}
 }
 
