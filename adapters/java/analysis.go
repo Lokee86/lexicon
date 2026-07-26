@@ -17,11 +17,13 @@ type importEvidence struct {
 }
 
 type analysisState struct {
-	declarations map[string][]string
-	facts        *factSet
-	imports      []importEvidence
-	namespaces   map[string]string
-	repositoryID string
+	declarations  map[string][]string
+	facts         *factSet
+	imports       []importEvidence
+	namespaces    map[string]string
+	relationships []relationshipEvidence
+	repositoryID  string
+	types         map[string][]typeDeclaration
 }
 
 func analyzeRepository(repository string) ([]byte, error) {
@@ -40,7 +42,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 
 	state := &analysisState{
 		declarations: make(map[string][]string), facts: facts, namespaces: make(map[string]string),
-		repositoryID: repositoryID,
+		repositoryID: repositoryID, types: make(map[string][]typeDeclaration),
 	}
 	for _, source := range snapshot.sources {
 		fileID := facts.addNode("file", filepath.Base(filepath.FromSlash(source.path)), source.path, source.path, source.path, source.path, nil, nil, contentID(source.content))
@@ -53,6 +55,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 		parseJavaSource(state, fileID, source.path, string(source.content))
 	}
 	state.resolveImports()
+	state.resolveRelationships()
 	return facts.render(snapshot.name)
 }
 
@@ -100,6 +103,11 @@ func (state *analysisState) ensureNamespace(packageName string) string {
 
 func (state *analysisState) registerDeclaration(qualifiedName, id string) {
 	state.declarations[qualifiedName] = appendUnique(state.declarations[qualifiedName], id)
+}
+
+func (state *analysisState) registerType(qualifiedName, id, declarationKind string) {
+	state.registerDeclaration(qualifiedName, id)
+	state.types[qualifiedName] = append(state.types[qualifiedName], typeDeclaration{id: id, declarationKind: declarationKind})
 }
 
 func appendUnique(items []string, item string) []string {

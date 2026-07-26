@@ -13,6 +13,7 @@ type javaParser struct {
 	packageName          string
 	path                 string
 	recordComponentTypes map[string][]string
+	resolution           resolutionContext
 	source               string
 	state                *analysisState
 	tokens               []token
@@ -26,7 +27,8 @@ func parseJavaSource(state *analysisState, fileID, path, source string) {
 	state.facts.addEdge(namespaceID, moduleID, "contains", path, nil, nil)
 	parser := &javaParser{
 		facts: state.facts, fileID: fileID, moduleID: moduleID, packageName: packageName,
-		path: path, recordComponentTypes: make(map[string][]string), source: source, state: state, tokens: tokens,
+		path: path, recordComponentTypes: make(map[string][]string),
+		resolution: resolutionContext{packageName: packageName}, source: source, state: state, tokens: tokens,
 	}
 	for _, problem := range lexErrors {
 		problemSpan := &span{EndColumn: problem.column + 1, EndLine: problem.line, Path: path, StartColumn: problem.column, StartLine: problem.line}
@@ -116,6 +118,13 @@ func (parser *javaParser) parseImports() {
 			expression: expression, id: id, owner: parser.path, span: statementSpan,
 			static: static, target: target, wildcard: wildcard,
 		})
+		if !static {
+			if wildcard {
+				parser.resolution.wildcardImports = append(parser.resolution.wildcardImports, target)
+			} else {
+				parser.resolution.explicitImports = append(parser.resolution.explicitImports, target)
+			}
+		}
 		index = end + 1
 	}
 }
@@ -192,8 +201,10 @@ func (parser *javaParser) parseType(start, keywordIndex, limit int, ownerID, par
 	}
 	typeSpan := parser.tokenSpan(keywordIndex, bodyClose+1)
 	id := parser.facts.addNode(kind, name, parser.path, qualifiedName, qualifiedName, parser.path, typeSpan, attributes, "")
-	parser.state.registerDeclaration(qualifiedName, id)
+	parser.state.registerType(qualifiedName, id, declarationKind)
 	parser.facts.addEdge(ownerID, id, relation, parser.path, typeSpan, nil)
+	parser.queueAnnotations(id, parentQualifiedName, start, keywordIndex)
+	parser.parseTypeRelationships(id, parentQualifiedName, nameIndex+1, bodyOpen)
 	if declarationKind == "record" {
 		parser.recordComponentTypes[qualifiedName] = parser.parseRecordComponents(id, qualifiedName, nameIndex+1, bodyOpen)
 	}

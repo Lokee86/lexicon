@@ -37,11 +37,18 @@ The foundation models:
 - nested member types;
 - ordinary and compact constructors, methods, fields, record components, and callable parameters;
 - file/module, package/module, declaration/member, and callable/parameter containment;
-- explicit unresolved `imports` or `defines` evidence rather than guessed targets.
+- declared `extends` and `implements` relationships from type headers;
+- sealed-type `permits` references marked with `role: permitted-subtype`;
+- annotation applications on modeled declarations;
+- explicit unresolved relationship, `imports`, or `defines` evidence rather than guessed targets.
 
 Classes, enums, and records use the common `type` node kind. Interfaces and annotation declarations use `interface`. Their exact Java surface is retained in `attributes.declaration_kind`. Record components use `field` with `declaration_kind: record-component`. Parameters preserve source order through their index and parent callable identity.
 
 Import nodes are defined by their compilation-unit module. An import node emits `imports` to one repository-local declaration when that declaration is unique. Imports that require the JDK, third-party classpaths, generated code, or unavailable source remain `external-target`; duplicate safe candidates remain `ambiguous-target`. Package declarations are represented by package namespace nodes and package-to-module containment.
+
+Declared type-header references resolve only to repository-local type declarations. The resolver considers an exact qualified name, the compilation unit's package, explicit non-static imports, non-static wildcard imports, and enclosing lexical type owners. It emits an edge only when the resulting target is unique; absent and ambiguous targets remain `external-target` and `ambiguous-target` unresolved records. `extends` clauses emit `extends`, `implements` clauses emit `implements`, and `permits` clauses emit `references` with `role: permitted-subtype` from the sealed declaration to the permitted declaration.
+
+Annotations on modeled types, constructors, methods, fields, record components, and parameters use the same conservative lookup. A uniquely resolved repository-local annotation declaration is the target of an `annotates` edge from the annotated declaration. External annotations and ambiguous local annotation names remain unresolved `annotates` evidence, preserving the source expression and span.
 
 ## Canonical identities and paths
 
@@ -73,7 +80,7 @@ The adapter excludes Git/worktree metadata (`.git`, `.worktrees`, `.workingtrees
 
 ## Current boundaries
 
-This foundation uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model inheritance edges, overrides, calls, dataflow, module descriptors, annotation application edges, local/anonymous classes, local variables, build dependency manifests, classpath resolution, generated sources, or incremental scope. It does not infer targets from same-named declarations.
+This adapter uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model implicit or transitive inheritance, overrides, calls, dataflow, module descriptors, local/anonymous classes, local variables, build dependency manifests, classpath resolution, generated sources, or incremental scope. It does not execute a compiler or infer targets from same-named declarations outside the supported package/import/lexical lookup. Annotation values, target legality, repeatable expansion, inherited annotations, and type-use placement are not semantically interpreted.
 
 Malformed literals/comments, unclosed type/member bodies, malformed package/import syntax, and member forms that cannot be classified safely remain explicit `unsupported-form` unresolved records. Valid declarations already isolated before a later malformed region may still be emitted; the unresolved record preserves the unsupported boundary. Invalid UTF-8 or NUL-containing files retain file/module evidence and emit an unresolved `defines` record.
 
@@ -83,7 +90,7 @@ Malformed literals/comments, unclosed type/member bodies, malformed package/impo
 go -C adapters/java test ./...
 ```
 
-The permanent fixture covers packages, local and external imports, static imports, every modeled type form, ordinary and compact constructors, methods, multi-field declarations, record components, parameters, nested types, malformed syntax, permanent exclusions, valid endpoints, canonical identities and ordering, byte determinism, checkout-path independence, stdout, and file output. A generated stream can also be checked with:
+The permanent fixtures cover packages, local and external imports, static imports, every modeled type form, ordinary and compact constructors, methods, multi-field declarations, record components, parameters, nested types, malformed syntax, permanent exclusions, declared inheritance and implementation, sealed permits, local and external annotations, exact/package/explicit/wildcard/lexical resolution, ambiguous targets, valid endpoints, canonical identities and ordering, byte determinism, checkout-path independence, stdout, and file output. A generated stream can also be checked with:
 
 ```text
 python tools/validate_jsonl.py /path/to/facts.jsonl
