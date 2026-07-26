@@ -41,6 +41,11 @@ def npm_command(*args: str) -> list[str]:
     return [str(node), str(npm_cli), *args]
 
 
+def dotnet_command(*args: str) -> list[str]:
+    dotnet = executable("dotnet", Path("C:/Program Files/dotnet/dotnet.exe"))
+    return [dotnet, *args]
+
+
 def run(command: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
     rendered = " ".join(command)
     print(f"[{cwd.name}] {rendered}", flush=True)
@@ -72,6 +77,30 @@ def build_adapters(root: Path, adapters: set[str]) -> None:
             [cargo, "build", "--release", "--manifest-path", "adapters/rust/Cargo.toml"],
             root,
         )
+    if "csharp" in adapters:
+        output = bin_dir / "csharp"
+        if output.exists():
+            shutil.rmtree(output)
+        run(
+            dotnet_command(
+                "publish",
+                "adapters/csharp/Lexicon.CSharp.csproj",
+                "--configuration",
+                "Release",
+                "--nologo",
+                "--output",
+                str(output),
+                "--self-contained",
+                "false",
+                "-p:AssemblyName=lexicon-csharp",
+                "-p:ContinuousIntegrationBuild=true",
+                "-p:DebugSymbols=false",
+                "-p:DebugType=None",
+                "-p:Deterministic=true",
+                "-p:UseAppHost=true",
+            ),
+            root,
+        )
 
 
 def adapter_command(root: Path, adapter: str, repository: Path, output: Path) -> tuple[list[str], dict[str, str]]:
@@ -92,6 +121,9 @@ def adapter_command(root: Path, adapter: str, repository: Path, output: Path) ->
         cargo = Path(executable("cargo.exe", Path.home() / ".cargo" / "bin" / "cargo.exe"))
         env["PATH"] = str(cargo.parent) + os.pathsep + env.get("PATH", "")
         binary = root / "adapters" / "rust" / "target" / "release" / ("lexicon-rust-adapter.exe" if os.name == "nt" else "lexicon-rust-adapter")
+        return [str(binary), "--repo", str(repository), "--output", str(output)], env
+    if adapter == "csharp":
+        binary = root / "evaluation" / "bin" / "csharp" / ("lexicon-csharp.exe" if os.name == "nt" else "lexicon-csharp")
         return [str(binary), "--repo", str(repository), "--output", str(output)], env
     raise ValueError(f"unsupported adapter: {adapter}")
 
@@ -218,7 +250,7 @@ def validate_case(root: Path, workspace: Path, output_root: Path, case: dict[str
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", action="append", choices=("python", "ruby", "typescript", "gdscript", "rust"))
+    parser.add_argument("--adapter", action="append", choices=("python", "ruby", "typescript", "gdscript", "rust", "csharp"))
     parser.add_argument("--case", action="append")
     parser.add_argument("--jobs", type=int, default=3)
     args = parser.parse_args()

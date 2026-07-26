@@ -87,6 +87,30 @@
       "split": "validation",
       "repository": "arcana",
       "required_relations": ["calls", "reads", "writes", "depends-on"]
+    },
+    {
+      "id": "csharp-spectre",
+      "adapter": "csharp",
+      "split": "calibration",
+      "repository": "corpus/cs-spectre",
+      "revision": "555a00ae317abc9b7a49100cda3251584b0a8861",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements"]
+    },
+    {
+      "id": "csharp-dapper",
+      "adapter": "csharp",
+      "split": "validation",
+      "repository": "corpus/cs-dapper",
+      "revision": "72a54c475f75e18cb93cba0809d00a5e6e49efd9",
+      "required_relations": ["calls", "reads", "writes", "depends-on"]
+    },
+    {
+      "id": "csharp-polly",
+      "adapter": "csharp",
+      "split": "holdout",
+      "repository": "corpus/cs-polly",
+      "revision": "9fd716c1e84288a6a8a1c7ad9426fb8a8e66942d",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements"]
     }
   ]
 }

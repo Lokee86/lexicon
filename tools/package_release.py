@@ -46,6 +46,20 @@ def cargo_executable() -> str:
     raise FileNotFoundError("cargo executable not found")
 
 
+def dotnet_executable() -> str:
+    found = shutil.which("dotnet")
+    if found:
+        return found
+    candidates = (
+        Path("C:/Program Files/dotnet/dotnet.exe"),
+        Path.home() / ".dotnet" / "dotnet",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    raise FileNotFoundError("dotnet executable not found")
+
+
 def copy_file(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
@@ -86,6 +100,42 @@ def build_typescript(repo: Path, output: Path) -> None:
         shutil.copytree(work / "node_modules", output / "node_modules")
 
 
+def build_csharp(repo: Path, output: Path) -> None:
+    source = repo / "adapters" / "csharp"
+    with tempfile.TemporaryDirectory(prefix="lexicon-csharp-") as temporary:
+        work = Path(temporary) / "adapter"
+        shutil.copytree(source, work, ignore=shutil.ignore_patterns("bin", "obj"))
+        publish = Path(temporary) / "publish"
+        run(
+            [
+                dotnet_executable(),
+                "publish",
+                "Lexicon.CSharp.csproj",
+                "--configuration",
+                "Release",
+                "--nologo",
+                "--output",
+                str(publish),
+                "--self-contained",
+                "false",
+                "-p:AssemblyName=lexicon-csharp",
+                "-p:ContinuousIntegrationBuild=true",
+                "-p:DebugSymbols=false",
+                "-p:DebugType=None",
+                "-p:Deterministic=true",
+                "-p:UseAppHost=true",
+            ],
+            work,
+        )
+        executable = publish / executable_name("lexicon-csharp")
+        if not executable.is_file():
+            raise FileNotFoundError(f"dotnet publish did not produce {executable.name}")
+        output.mkdir(parents=True, exist_ok=True)
+        for path in sorted(publish.iterdir()):
+            if path.is_file() and path.suffix.lower() != ".pdb":
+                copy_file(path, output / path.name)
+
+
 def build_distribution(repo: Path, output: Path, version: str | None = None) -> None:
     if output == repo or repo / "adapters" in output.parents or repo / "tools" in output.parents:
         raise ValueError("output must not replace repository sources")
@@ -104,6 +154,7 @@ def build_distribution(repo: Path, output: Path, version: str | None = None) -> 
     run([cargo_executable(), "build", "--release", "--locked", "--manifest-path", str(rust / "Cargo.toml")], repo)
     copy_file(rust / "target" / "release" / executable_name("lexicon-rust-adapter"), rust_output)
 
+    build_csharp(repo, adapters / "csharp")
     build_typescript(repo, adapters / "typescript")
     copy_sources(repo / "adapters" / "python", adapters / "python", ".py")
     copy_sources(repo / "adapters" / "ruby", adapters / "ruby", ".rb")

@@ -46,10 +46,15 @@ python evaluation/compare_jsonl.py LEFT.jsonl RIGHT.jsonl
 | JavaScript / TypeScript / Svelte | workspace-mcp | Pinned Lexicanter snapshot | Space Rocks Astro site |
 | GDScript | Alien Attack | Space Rocks client | Speedy Saucer |
 | Rust | Grimoire vector engine | Arcana | — |
+| C# | Pinned Spectre snapshot | Pinned Dapper snapshot | Pinned Polly snapshot |
 
 The Go adapter has a separate dated two-repository record in [`docs/GO_ADAPTER_VALIDATION.md`](../docs/GO_ADAPTER_VALIDATION.md). Go application and adapter tests remain part of `run_tests.py`.
 
 Calibration cases are used to understand and tune language-general behavior. Validation cases protect known realistic behavior. Holdouts provide a separate check against overfitting to calibration repositories.
+
+The C# corpus exercises Roslyn-backed extraction across application, library, and policy-oriented code. Spectre covers calibration of calls, dataflow, dependencies, inheritance, and interface implementation; Dapper protects the validation path for calls, dataflow, and dependencies; Polly is an independent holdout for the same broad relation surface.
+
+C# corpus sources follow the pinned-source convention: each case uses an existing workspace-level checkout under `corpus/cs-*`, and `corpus.json` records the exact Git revision that the checkout must represent. Validation does not float these cases to the current branch tip. Changing a C# source revision is an explicit corpus update that must be reviewed together with its resulting validation evidence.
 
 ## Gates
 
