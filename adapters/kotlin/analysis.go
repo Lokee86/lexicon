@@ -14,6 +14,7 @@ type analysis struct {
 	repositoryID     string
 	repositoryName   string
 	relationshipByQN map[string][]relationshipTarget
+	runtime          *runtimeIndex
 }
 
 func analyzeRepository(repository string) ([]byte, error) {
@@ -25,6 +26,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 	state := &analysis{
 		facts: facts, moduleByPath: make(map[string]string), namespaceByQN: make(map[string]string),
 		relationshipByQN: make(map[string][]relationshipTarget), repositoryName: repositoryName,
+		runtime: newRuntimeIndex(),
 	}
 	state.repositoryID = facts.addNode(
 		"repository", repositoryName, repositoryName, ".", repositoryName, "", nil,
@@ -82,6 +84,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 		}
 	}
 	state.emitRelationships()
+	state.emitRuntimeSemantics()
 	return facts.render(repositoryName)
 }
 

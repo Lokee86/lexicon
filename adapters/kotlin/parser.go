@@ -28,9 +28,17 @@ type supertypeDecl struct {
 	targetName         string
 }
 
+type tokenRange struct {
+	end   int
+	start int
+}
+
 type declaration struct {
 	annotations []string
+	body        tokenRange
 	children    []*declaration
+	delegation  tokenRange
+	delegated   bool
 	form        string
 	kind        string
 	modifiers   []string
@@ -53,6 +61,7 @@ type parsedKotlinFile struct {
 	packageName  string
 	packageSpan  *sourceSpan
 	path         string
+	tokens       []token
 }
 
 type parser struct {
@@ -85,7 +94,7 @@ type declarationPrefix struct {
 func parseKotlinFile(path string, content []byte) *parsedKotlinFile {
 	tokens, lexerDiagnostics := lex(content)
 	state := &parser{content: content, diagnostics: append([]syntaxDiagnostic(nil), lexerDiagnostics...), path: path, tokens: tokens}
-	result := &parsedKotlinFile{content: content, path: path}
+	result := &parsedKotlinFile{content: content, path: path, tokens: tokens}
 
 	state.skipSeparators()
 	for state.at("@") {

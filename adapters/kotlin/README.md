@@ -46,6 +46,7 @@ The foundation emits:
 - explicit unresolved relationship records for external, ambiguous, or unsupported supertype and annotation targets rather than synthetic semantic targets;
 - explicit primary constructors (including the implicit empty constructor) and secondary constructors;
 - top-level functions and member methods;
+- retained token ranges for modeled function, method, and secondary-constructor bodies, used only by the conservative runtime pass;
 - top-level, member, extension, and primary-constructor properties, represented by the common facts-v1 `field` kind;
 - callable and constructor parameters;
 - `contains` and `defines` ownership edges for declarations and parameters;
@@ -54,6 +55,14 @@ The foundation emits:
 - explicit `unresolved` records with relation `defines`, reason `unsupported-form`, and parser diagnostics for malformed delimiters, malformed declarations, unsupported destructuring properties, unterminated literals/comments, and other declaration syntax the structural parser cannot interpret safely.
 
 Enum entries, property accessors, local declarations, and initializer/body expressions are not emitted as declarations. Their text is skipped without execution.
+
+## Conservative runtime semantics
+
+The runtime pass consumes only tokens retained by the structural parser. It emits a definite `calls` edge only when one repository-local target remains after exact name and argument-count matching. Covered forms are unqualified and `this` calls to methods on the containing declaration, unqualified same-package top-level functions, explicit repository-local object or companion calls (including a class name used to qualify its unique companion), direct constructor calls, and explicit secondary-constructor `this(...)` and `super(...)` delegation. Multiple same-owner overloads with the same arity emit `possible-calls`; external names, value/dynamic receivers, and recognized unsupported call forms remain unresolved `calls` evidence instead of being guessed.
+
+Modeled methods emit `overrides` only to an exact declared-name, normalized extension-receiver, and normalized parameter-type signature on a uniquely resolved direct repository-local supertype. This is declaration matching, not compiler override validation.
+
+The pass emits `reads` and `writes` only to modeled callable parameters and non-delegated properties when a bare identifier, `this` member, or explicit repository-local object/companion member proves ownership. Assignment writes; compound assignment and increment/decrement read and write. A local, destructured, lambda-bound, or delegated name suppresses property/parameter inference rather than creating or guessing a target.
 
 ## Canonical identities
 
@@ -111,16 +120,18 @@ cd adapters/kotlin
 go test -race ./...
 ```
 
-The permanent foundation fixture covers package/import evidence, declarations, parameters, nullability, exclusions, malformed syntax, valid edge endpoints, repository-relative paths, CLI behavior, canonical IDs, and byte determinism. The focused relationship fixture covers exact, same-package, explicit-import, alias, aliased-nested, wildcard, and lexical-nested resolution; class and interface headers; delegation metadata; local annotation applications; ambiguous and external evidence; valid endpoints; and repeated full-stream byte determinism.
+The permanent foundation fixture covers package/import evidence, declarations, parameters, nullability, exclusions, malformed syntax, valid edge endpoints, repository-relative paths, CLI behavior, canonical IDs, and byte determinism. The focused relationship fixture covers exact, same-package, explicit-import, alias, aliased-nested, wildcard, and lexical-nested resolution; class and interface headers; delegation metadata; local annotation applications; ambiguous and external evidence; valid endpoints; and repeated full-stream byte determinism. The runtime fixture covers retained body/delegation ranges, top-level/member/object/companion/constructor calls, overload candidates, external/dynamic/unsupported calls, direct-super overrides, property/parameter reads, property writes, local/destructured/delegated exclusions, valid endpoints, and repeated byte determinism.
 
 ## Current boundaries
 
 This foundation is syntax-structural rather than compiler-semantic. It deliberately does not:
 
 - evaluate Gradle settings, builds, source sets, dependencies, compiler plugins, or Kotlin scripts;
-- invoke the Kotlin compiler or resolve targets from libraries, generated code, default imports, type aliases, companion scopes, expression types, or build configuration;
-- infer calls, reads, writes, overrides, dependency manifests, delegated-property semantics, or delegation behavior beyond retaining a declared supertype delegation expression;
+- invoke the Kotlin compiler or resolve targets from libraries, generated code, default imports, type aliases, expression types, or build configuration;
+- perform compiler overload resolution, default-argument matching, generic-call parsing, inherited or virtual dispatch, imported/extension-call binding, safe-call resolution, callable-value flow, or primary-constructor supertype-invocation analysis;
+- infer reads or writes for locals, destructured/delegated symbols, arbitrary value receivers, accessors, initializers, aliases, or nested executable scopes;
+- infer dependency manifests, delegated-property semantics, or delegation behavior beyond retaining a declared supertype delegation expression and explicit secondary-constructor `this(...)`/`super(...)` calls;
 - model enum entries, type parameters, local declarations, accessors, contracts, annotation arguments/use-site behavior, annotations as separate application nodes, or generated declarations;
 - recover an unsafe declaration by guessing its name or shape.
 
-Imports retain source evidence but target deterministic external syntactic symbols; they are not claims of successful compiler resolution. The relationship pass separately uses import declarations only to identify unique repository-local type and annotation-class targets. External and ambiguous relationship targets remain unresolved, and unsupported or malformed syntax is preserved as unresolved evidence instead of being silently converted into a declaration. These boundaries keep the adapter safe and deterministic while leaving compiler-backed resolution, calls, dataflow, overrides, and dependency surfaces for later slices.
+Imports retain source evidence but target deterministic external syntactic symbols; they are not claims of successful compiler resolution. The relationship pass uses imports only to identify repository-local type and annotation-class targets; the runtime pass uses type imports only while resolving explicit type/object/companion owners and constructors, never to bind imported top-level or extension functions. External and ambiguous relationship targets remain unresolved. Runtime ambiguity becomes `possible-calls` only after ownership is proven; otherwise external, dynamic, ambiguous-owner, unsupported, or malformed evidence stays unresolved. These boundaries keep the adapter safe and deterministic while leaving compiler-backed resolution, broader runtime/dataflow analysis, and dependency surfaces for later slices.

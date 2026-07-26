@@ -46,16 +46,23 @@ func (state *parser) parseFunction(prefix declarationPrefix) *declaration {
 	for state.at("where") {
 		state.skipStatementHeader()
 	}
+	body := tokenRange{}
 	if state.at("{") {
+		open := state.index
+		if close := state.matchingDelimiter(open, "{", "}"); close >= 0 {
+			body = tokenRange{start: open + 1, end: close}
+		}
 		state.skipBalanced("{", "}")
 	} else if state.at("=") {
+		body.start = state.index + 1
 		state.skipExpression()
+		body.end = state.index
 	}
 	end := maxInt(start, state.index-1)
 	return &declaration{
 		annotations: prefix.annotations, form: "function", kind: "function",
 		modifiers: prefix.modifiers, name: name, parameters: parameters,
-		receiver: receiver, returnType: returnType, span: state.span(start, end),
+		body: body, receiver: receiver, returnType: returnType, span: state.span(start, end),
 	}
 }
 
@@ -106,7 +113,8 @@ func (state *parser) parseProperty(prefix declarationPrefix) *declaration {
 	}
 	return &declaration{
 		annotations: prefix.annotations, form: "property", kind: "field", modifiers: prefix.modifiers,
-		mutable: mutable, name: name, receiver: receiver, span: state.span(start, maxInt(start, state.index-1)), typeName: typeName,
+		delegated: by >= 0, mutable: mutable, name: name, receiver: receiver,
+		span: state.span(start, maxInt(start, state.index-1)), typeName: typeName,
 	}
 }
 
@@ -124,19 +132,31 @@ func (state *parser) parseConstructor(prefix declarationPrefix, primary bool) *d
 		state.skipStatement()
 		return nil
 	}
+	delegation := tokenRange{}
 	for state.current().kind != tokenEOF && state.current().kind != tokenNewline && !state.at("{") && !state.at(";") {
+		if (state.at("this") || state.at("super")) && state.index+1 < len(state.tokens) && state.tokens[state.index+1].text == "(" {
+			if close := state.matchingDelimiter(state.index+1, "(", ")"); close >= 0 {
+				delegation = tokenRange{start: state.index, end: close + 1}
+			}
+		}
 		if state.at("(") {
 			state.skipBalanced("(", ")")
 		} else {
 			state.index++
 		}
 	}
+	body := tokenRange{}
 	if state.at("{") {
+		open := state.index
+		if close := state.matchingDelimiter(open, "{", "}"); close >= 0 {
+			body = tokenRange{start: open + 1, end: close}
+		}
 		state.skipBalanced("{", "}")
 	}
 	return &declaration{
 		annotations: prefix.annotations, form: "secondary_constructor", kind: "constructor",
-		modifiers: prefix.modifiers, name: "constructor", parameters: parameters,
-		primary: primary, span: state.span(start, maxInt(start, state.index-1)),
+		body: body, delegation: delegation, modifiers: prefix.modifiers,
+		name: "constructor", parameters: parameters, primary: primary,
+		span: state.span(start, maxInt(start, state.index-1)),
 	}
 }

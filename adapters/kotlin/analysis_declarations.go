@@ -35,6 +35,7 @@ func (state *analysis) emitDeclaration(file *parsedKotlinFile, declaration *decl
 	state.facts.addEdge(ownerID, id, "contains", file.path, &declaration.span, nil)
 	state.facts.addEdge(ownerID, id, "defines", file.path, &declaration.span, nil)
 	state.indexRelationshipTarget(id, qualifiedBase, kind, declaration.form)
+	runtimeCallable := state.indexRuntimeDeclaration(file, declaration, id, kind, ownerQN, ownerKind, qualifiedBase)
 	state.queueAnnotations(file, id, ownerQN, declaration.annotations, declaration.span)
 	if declaration.kind == "type" || declaration.kind == "interface" {
 		state.queueSupertypes(file, id, ownerQN, declaration.supertypes)
@@ -48,6 +49,9 @@ func (state *analysis) emitDeclaration(file *parsedKotlinFile, declaration *decl
 			parameterID := state.facts.addNode("parameter", parameterCanonical, parameter.name, file.path, parameterQN, file.path, &parameter.span, parameterAttributes)
 			state.facts.addEdge(id, parameterID, "contains", file.path, &parameter.span, nil)
 			state.facts.addEdge(id, parameterID, "defines", file.path, &parameter.span, nil)
+			if runtimeCallable != nil {
+				runtimeCallable.parameters[parameter.name] = append(runtimeCallable.parameters[parameter.name], parameterID)
+			}
 			state.queueAnnotations(file, parameterID, ownerQN, parameter.annotations, parameter.span)
 		}
 	}
