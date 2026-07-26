@@ -16,6 +16,12 @@ type sourceFile struct {
 	path     string
 }
 
+type manifestFile struct {
+	content []byte
+	format  string
+	path    string
+}
+
 var excludedDirectories = map[string]struct{}{
 	".arcana": {}, ".bundle": {}, ".cantrip": {}, ".ddocs": {}, ".git": {},
 	".godot": {}, ".gradle": {}, ".grimoire": {}, ".homunculus": {}, ".idea": {},
@@ -27,24 +33,25 @@ var excludedDirectories = map[string]struct{}{
 	"temp": {}, "tmp": {}, "vendor": {},
 }
 
-func discoverSources(repository string) (string, string, []sourceFile, error) {
+func discoverRepository(repository string) (string, string, []sourceFile, []manifestFile, error) {
 	root, err := filepath.Abs(repository)
 	if err != nil {
-		return "", "", nil, fmt.Errorf("resolve repository: %w", err)
+		return "", "", nil, nil, fmt.Errorf("resolve repository: %w", err)
 	}
 	info, err := os.Stat(root)
 	if err != nil {
-		return "", "", nil, fmt.Errorf("stat repository: %w", err)
+		return "", "", nil, nil, fmt.Errorf("stat repository: %w", err)
 	}
 	if !info.IsDir() {
-		return "", "", nil, errors.New("repository path is not a directory")
+		return "", "", nil, nil, errors.New("repository path is not a directory")
 	}
 	repositoryName := filepath.Base(filepath.Clean(root))
 	if repositoryName == "." || repositoryName == string(filepath.Separator) || repositoryName == "" {
-		return "", "", nil, errors.New("repository path has no stable directory name")
+		return "", "", nil, nil, errors.New("repository path has no stable directory name")
 	}
 
 	var sources []sourceFile
+	var manifests []manifestFile
 	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -64,7 +71,7 @@ func discoverSources(repository string) (string, string, []sourceFile, error) {
 			}
 			return nil
 		}
-		if !entry.Type().IsRegular() || !isKotlinSource(entry.Name()) {
+		if !entry.Type().IsRegular() || (!isKotlinSource(entry.Name()) && manifestFormat(entry.Name()) == "") {
 			return nil
 		}
 		relative, err := filepath.Rel(root, path)
@@ -79,14 +86,19 @@ func discoverSources(repository string) (string, string, []sourceFile, error) {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", relative, err)
 		}
-		sources = append(sources, sourceFile{absolute: path, content: content, path: relative})
+		if format := manifestFormat(entry.Name()); format != "" {
+			manifests = append(manifests, manifestFile{content: content, format: format, path: relative})
+		} else {
+			sources = append(sources, sourceFile{absolute: path, content: content, path: relative})
+		}
 		return nil
 	})
 	if err != nil {
-		return "", "", nil, fmt.Errorf("scan repository: %w", err)
+		return "", "", nil, nil, fmt.Errorf("scan repository: %w", err)
 	}
 	sort.Slice(sources, func(i, j int) bool { return sources[i].path < sources[j].path })
-	return root, repositoryName, sources, nil
+	sort.Slice(manifests, func(i, j int) bool { return manifests[i].path < manifests[j].path })
+	return root, repositoryName, sources, manifests, nil
 }
 
 func isExcludedDirectory(name string) bool {
@@ -95,8 +107,24 @@ func isExcludedDirectory(name string) bool {
 }
 
 func isKotlinSource(name string) bool {
+	if manifestFormat(name) != "" {
+		return false
+	}
 	extension := strings.ToLower(filepath.Ext(name))
 	return extension == ".kt" || extension == ".kts"
+}
+
+func manifestFormat(name string) string {
+	switch strings.ToLower(name) {
+	case "build.gradle.kts":
+		return "gradle-kotlin"
+	case "build.gradle":
+		return "gradle-groovy"
+	case "pom.xml":
+		return "maven"
+	default:
+		return ""
+	}
 }
 
 func normalizeRelativePath(path string) (string, error) {

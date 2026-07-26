@@ -18,7 +18,7 @@ type analysis struct {
 }
 
 func analyzeRepository(repository string) ([]byte, error) {
-	_, repositoryName, sources, err := discoverSources(repository)
+	_, repositoryName, sources, manifests, err := discoverRepository(repository)
 	if err != nil {
 		return nil, err
 	}
@@ -30,9 +30,20 @@ func analyzeRepository(repository string) ([]byte, error) {
 	}
 	state.repositoryID = facts.addNode(
 		"repository", repositoryName, repositoryName, ".", repositoryName, "", nil,
-		map[string]any{"analysis_mode": "structural", "source_file_count": len(sources)},
+		map[string]any{
+			"analysis_mode": "structural", "dependency_manifest_count": len(manifests),
+			"source_file_count": len(sources),
+		},
 	)
-	state.emitDirectories(sources)
+	paths := make([]string, 0, len(sources)+len(manifests))
+	for _, source := range sources {
+		paths = append(paths, source.path)
+	}
+	for _, manifest := range manifests {
+		paths = append(paths, manifest.path)
+	}
+	state.emitDirectories(paths)
+	state.emitManifestFacts(manifests)
 
 	parsed := make([]*parsedKotlinFile, 0, len(sources))
 	for _, source := range sources {
@@ -88,10 +99,10 @@ func analyzeRepository(repository string) ([]byte, error) {
 	return facts.render(repositoryName)
 }
 
-func (state *analysis) emitDirectories(sources []sourceFile) {
+func (state *analysis) emitDirectories(paths []string) {
 	directories := map[string]struct{}{}
-	for _, source := range sources {
-		directory := pathDirectory(source.path)
+	for _, path := range paths {
+		directory := pathDirectory(path)
 		for directory != "." && directory != "" {
 			directories[directory] = struct{}{}
 			directory = pathDirectory(directory)
