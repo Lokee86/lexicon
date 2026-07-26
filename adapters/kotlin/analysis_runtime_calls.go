@@ -87,6 +87,9 @@ func (state *analysis) resolveQualifiedInvocation(
 	invocation runtimeInvocation,
 	shadowed map[string]struct{},
 ) ([]*runtimeCallable, string) {
+	if targets, reason, receiver := state.resolveExtensionInvocation(callable, invocation); receiver {
+		return targets, reason
+	}
 	first := invocation.qualifier
 	if dot := strings.IndexByte(first, '.'); dot >= 0 {
 		first = first[:dot]

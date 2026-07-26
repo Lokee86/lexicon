@@ -5,6 +5,7 @@ type runtimeInvocation struct {
 	calleeStart int
 	close       int
 	expression  string
+	fluent      bool
 	name        string
 	open        int
 	qualifier   string
@@ -47,12 +48,28 @@ func runtimeInvocations(file *parsedKotlinFile, ranges ...tokenRange) []runtimeI
 			result = append(result, runtimeInvocation{
 				arity: runtimeArgumentArity(file.tokens, open+1, close), calleeStart: start,
 				close: close, expression: compactTokenRange(file.tokens, start, close+1),
-				name: identifierText(current), open: open, qualifier: qualifier,
+				fluent: runtimeCallResultIsReceiver(file.tokens, close, bounds.end),
+				name:   identifierText(current), open: open, qualifier: qualifier,
 				span: runtimeTokenSpan(file.path, file.tokens[start], file.tokens[close]), unsupported: unsupported,
 			})
 		}
 	}
 	return result
+}
+
+func runtimeCallResultIsReceiver(tokens []token, close, upper int) bool {
+	next := nextRuntimeToken(tokens, close+1, upper)
+	if next >= upper {
+		return false
+	}
+	if tokens[next].text == "." {
+		return true
+	}
+	if tokens[next].text != "?" {
+		return false
+	}
+	dot := nextRuntimeToken(tokens, next+1, upper)
+	return dot < upper && tokens[dot].text == "."
 }
 
 func runtimeCalleeStart(tokens []token, name, lower int) (int, bool) {

@@ -9,6 +9,7 @@ type runtimeIndex struct {
 	callables       []*runtimeCallable
 	callablesByKey  map[string][]*runtimeCallable
 	constructors    map[string][]*runtimeCallable
+	extensionsByQN  map[string][]*runtimeCallable
 	propertiesByKey map[string][]runtimeProperty
 	typesByID       map[string]*runtimeType
 	typesByQN       map[string][]*runtimeType
@@ -27,6 +28,7 @@ type runtimeCallable struct {
 
 type runtimeProperty struct {
 	declaration *declaration
+	file        *parsedKotlinFile
 	id          string
 	ownerQN     string
 }
@@ -45,6 +47,7 @@ func newRuntimeIndex() *runtimeIndex {
 	return &runtimeIndex{
 		callablesByKey:  make(map[string][]*runtimeCallable),
 		constructors:    make(map[string][]*runtimeCallable),
+		extensionsByQN:  make(map[string][]*runtimeCallable),
 		propertiesByKey: make(map[string][]runtimeProperty),
 		typesByID:       make(map[string]*runtimeType),
 		typesByQN:       make(map[string][]*runtimeType),
@@ -65,7 +68,7 @@ func (state *analysis) indexRuntimeDeclaration(
 		state.runtime.typesByID[id] = target
 		state.runtime.typesByQN[qualifiedBase] = append(state.runtime.typesByQN[qualifiedBase], target)
 	case "field":
-		property := runtimeProperty{declaration: declaration, id: id, ownerQN: ownerQN}
+		property := runtimeProperty{declaration: declaration, file: file, id: id, ownerQN: ownerQN}
 		key := runtimeMemberKey(ownerQN, declaration.name)
 		state.runtime.propertiesByKey[key] = append(state.runtime.propertiesByKey[key], property)
 	case "function", "method", "constructor":
@@ -82,6 +85,11 @@ func (state *analysis) indexRuntimeDeclaration(
 		} else {
 			key := runtimeCallableKey(ownerQN, declaration.name, len(declaration.parameters))
 			state.runtime.callablesByKey[key] = append(state.runtime.callablesByKey[key], callable)
+			if declaration.receiver != "" {
+				state.runtime.extensionsByQN[qualifiedBase] = append(
+					state.runtime.extensionsByQN[qualifiedBase], callable,
+				)
+			}
 		}
 		return callable
 	}
