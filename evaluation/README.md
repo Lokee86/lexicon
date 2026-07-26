@@ -36,6 +36,9 @@ Useful focused forms:
 
 ```text
 python evaluation/run_validation.py --adapter gdscript
+python evaluation/run_validation.py --adapter java --adapter kotlin --jobs 3
+python evaluation/run_validation.py --case java-jsoup --jobs 1
+python evaluation/run_validation.py --case kotlin-detekt --jobs 1
 python evaluation/run_validation.py --case gdscript-space-rocks-client --jobs 1
 python evaluation/compare_jsonl.py LEFT.jsonl RIGHT.jsonl
 ```
@@ -50,10 +53,12 @@ python evaluation/compare_jsonl.py LEFT.jsonl RIGHT.jsonl
 | GDScript | Alien Attack | Space Rocks client | Speedy Saucer |
 | Rust | Grimoire vector engine | Arcana | — |
 | C# | Pinned Spectre snapshot | Pinned Dapper snapshot | Pinned Polly snapshot |
+| Java | Pinned jsoup snapshot | Pinned Gson snapshot | Pinned HikariCP snapshot |
+| Kotlin | Pinned detekt snapshot | Pinned kotlinx.coroutines snapshot | Pinned Now in Android snapshot |
 
 The Go adapter has a separate dated two-repository record in [`docs/GO_ADAPTER_VALIDATION.md`](../docs/GO_ADAPTER_VALIDATION.md). Go application and adapter tests remain part of `run_tests.py`.
 
-Java and Kotlin currently enter the canonical test matrix through their permanent structural, relationship, runtime-semantics, dependency-manifest, contract, race, and byte-determinism fixtures. A pinned real-repository JVM corpus has not yet been accepted, so the current JVM validation record does not make corpus-level precision or recall claims.
+Java and Kotlin enter the canonical test matrix through their permanent structural, relationship, runtime-semantics, dependency-manifest, contract, race, and byte-determinism fixtures. Their pinned real-repository calibration, validation, and holdout cases are summarized in [`docs/JVM_CORPUS_CALIBRATION.md`](../docs/JVM_CORPUS_CALIBRATION.md). Corpus counts remain dated deterministic coverage evidence, not precision or recall claims.
 
 Calibration cases are used to understand and tune language-general behavior. Validation cases protect known realistic behavior. Holdouts provide a separate check against overfitting to calibration repositories.
 

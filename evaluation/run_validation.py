@@ -93,10 +93,12 @@ def build_adapters(root: Path, adapters: set[str]) -> None:
     bin_dir.mkdir(parents=True, exist_ok=True)
     if "typescript" in adapters:
         run(npm_command("run", "build"), root / "adapters" / "typescript")
-    if "gdscript" in adapters:
-        output = bin_dir / ("lexicon-gdscript.exe" if os.name == "nt" else "lexicon-gdscript")
+    go_adapters = adapters & {"gdscript", "java", "kotlin"}
+    if go_adapters:
         go = executable("go.exe", Path("C:/Program Files/Go/bin/go.exe"))
-        run([go, "build", "-o", str(output), "."], root / "adapters" / "gdscript")
+        for adapter in sorted(go_adapters):
+            output = bin_dir / (f"lexicon-{adapter}.exe" if os.name == "nt" else f"lexicon-{adapter}")
+            run([go, "build", "-o", str(output), "."], root / "adapters" / adapter)
     if "rust" in adapters:
         cargo = executable("cargo.exe", Path.home() / ".cargo" / "bin" / "cargo.exe")
         run(
@@ -149,9 +151,9 @@ def adapter_command(
     if adapter == "typescript":
         node = executable("node.exe", Path("C:/Program Files/nodejs/node.exe"))
         return [node, str(root / "adapters" / "typescript" / "dist" / "cli.js"), "--repo", str(repository), "--output", str(output)], env
-    if adapter == "gdscript":
-        binary = root / "evaluation" / "bin" / ("lexicon-gdscript.exe" if os.name == "nt" else "lexicon-gdscript")
-        return [str(binary), "--repo", str(repository), "--output", str(output)], env
+    if adapter in {"gdscript", "java", "kotlin"}:
+        binary = root / "evaluation" / "bin" / (f"lexicon-{adapter}.exe" if os.name == "nt" else f"lexicon-{adapter}")
+        return [str(binary), "--repo", str(repository), "--output", str(output), *extra_args], env
     if adapter == "rust":
         cargo = Path(executable("cargo.exe", Path.home() / ".cargo" / "bin" / "cargo.exe"))
         env["PATH"] = str(cargo.parent) + os.pathsep + env.get("PATH", "")
@@ -251,6 +253,14 @@ def validate_case(root: Path, workspace: Path, output_root: Path, case: dict[str
     repository = workspace / case["repository"]
     if not repository.exists():
         raise FileNotFoundError(f"missing corpus repository: {repository}")
+    expected_revision = case.get("revision")
+    if expected_revision:
+        actual_revision = run(["git", "rev-parse", "HEAD"], repository).strip()
+        if actual_revision != expected_revision:
+            raise RuntimeError(
+                f"corpus revision mismatch for {case['id']}: "
+                f"expected {expected_revision}, found {actual_revision}"
+            )
 
     durations: list[float] = []
     outputs: list[Path] = []
@@ -312,7 +322,11 @@ def corpus_workspace(root: Path) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", action="append", choices=("python", "ruby", "typescript", "gdscript", "rust", "csharp"))
+    parser.add_argument(
+        "--adapter",
+        action="append",
+        choices=("python", "ruby", "typescript", "gdscript", "rust", "csharp", "java", "kotlin"),
+    )
     parser.add_argument("--case", action="append")
     parser.add_argument("--jobs", type=int, default=3)
     args = parser.parse_args()

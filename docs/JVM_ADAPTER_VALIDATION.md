@@ -65,4 +65,4 @@ This validation does not establish:
 - complete local-variable, expression-type, delegated-property, coroutine, lambda, anonymous/local-class, or framework semantics;
 - real-repository precision, recall, throughput, or memory measurements.
 
-A pinned Java/Kotlin corpus should be added before publishing comparative semantic-quality or performance claims against other analyzers.
+The pinned real-repository JVM corpus and its initial measurements are recorded in [JVM_CORPUS_CALIBRATION.md](JVM_CORPUS_CALIBRATION.md). Those measurements establish deterministic coverage baselines, not compiler-equivalent precision or recall.

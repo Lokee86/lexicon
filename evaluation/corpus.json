@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
       "id": "python-doc-ledger",
@@ -114,6 +114,54 @@
       "revision": "9fd716c1e84288a6a8a1c7ad9426fb8a8e66942d",
       "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements"],
       "adapter_args": ["--project-loading", "msbuild"]
+    },
+    {
+      "id": "java-jsoup",
+      "adapter": "java",
+      "split": "calibration",
+      "repository": "corpus/java-jsoup",
+      "revision": "d24b16d952530f3aefe87e91c344b23fe4b8a7fc",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements"]
+    },
+    {
+      "id": "java-gson",
+      "adapter": "java",
+      "split": "validation",
+      "repository": "corpus/java-gson",
+      "revision": "aebc51a56ca0793c13b841c29f73433b82446695",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements"]
+    },
+    {
+      "id": "java-hikaricp",
+      "adapter": "java",
+      "split": "holdout",
+      "repository": "corpus/java-hikaricp",
+      "revision": "a4d93f4f85517f90e632b795486d7102e933d7ff",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements", "overrides"]
+    },
+    {
+      "id": "kotlin-detekt",
+      "adapter": "kotlin",
+      "split": "calibration",
+      "repository": "corpus/kotlin-detekt",
+      "revision": "f9e1d5cc239ab740ce499b1edb36b872012648e2",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements"]
+    },
+    {
+      "id": "kotlin-coroutines",
+      "adapter": "kotlin",
+      "split": "validation",
+      "repository": "corpus/kotlin-coroutines",
+      "revision": "04ada74fae2e8914ae92ece34e06e80bb15385e9",
+      "required_relations": ["calls", "reads", "writes", "depends-on", "extends", "implements", "overrides"]
+    },
+    {
+      "id": "kotlin-nowinandroid",
+      "adapter": "kotlin",
+      "split": "holdout",
+      "repository": "corpus/kotlin-nowinandroid",
+      "revision": "7d45eae4f8720a0c77f507712ba2437ff974b6ed",
+      "required_relations": ["calls", "reads", "writes", "extends", "implements"]
     }
   ]
 }

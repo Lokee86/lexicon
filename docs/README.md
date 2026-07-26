@@ -30,6 +30,7 @@ Lexicon documentation follows these rules:
 | [GO_ADAPTER_VALIDATION.md](GO_ADAPTER_VALIDATION.md) | Dated Go semantic-adapter validation record and its measured limits |
 | [CSHARP_ADAPTER_VALIDATION.md](CSHARP_ADAPTER_VALIDATION.md) | Dated C# semantic-adapter calibration and validation record |
 | [JVM_ADAPTER_VALIDATION.md](JVM_ADAPTER_VALIDATION.md) | Dated Java and Kotlin fixture, contract, determinism, and boundary validation record |
+| [JVM_CORPUS_CALIBRATION.md](JVM_CORPUS_CALIBRATION.md) | Pinned Java/Kotlin calibration, validation, holdout, measurements, stress findings, and next priorities |
 | [RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) | Distribution layout, build requirements, runtime requirements, and packaging command |
 
 ## Related documentation

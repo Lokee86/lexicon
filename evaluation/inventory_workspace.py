@@ -20,6 +20,9 @@ LANGUAGE_EXTENSIONS = {
     ".gd": "gdscript",
     ".rs": "rust",
     ".go": "go",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
 }
 
 IGNORED_DIRECTORIES = {
@@ -56,6 +59,9 @@ MANIFESTS = (
     "project.godot",
     "Cargo.toml",
     "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
 )
 
 
