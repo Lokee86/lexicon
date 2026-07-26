@@ -26,6 +26,17 @@ def dotnet() -> str:
     raise FileNotFoundError("dotnet SDK not found; set LEXICON_DOTNET")
 
 
+def prepare_adapter() -> None:
+    completed = subprocess.run(
+        [dotnet(), "build", str(PROJECT), "--nologo"],
+        cwd=ADAPTER,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stdout + completed.stderr)
+
+
 def run_adapter(output: Path, *scope: str) -> list[dict[str, object]]:
     command = [
         dotnet(),
@@ -55,6 +66,7 @@ def assert_valid(records: list[dict[str, object]]) -> None:
 
 
 def main() -> int:
+    prepare_adapter()
     with tempfile.TemporaryDirectory(prefix="lexicon-csharp-test-") as temporary:
         directory = Path(temporary)
         first_path = directory / "first.jsonl"

@@ -9,6 +9,8 @@
 **/.pytest_cache/
 **/.bundle/
 **/vendor/bundle/
+**/bin/
+**/obj/
 
 # Generated facts and temporary files
 .lexicon/
