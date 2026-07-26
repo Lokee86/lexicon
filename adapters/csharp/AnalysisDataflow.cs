@@ -8,7 +8,7 @@ internal sealed partial class Analysis
     {
         foreach (var document in model.Documents)
         {
-            var semantic = model.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
+            var semantic = document.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
             foreach (var identifier in document.SyntaxTree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>())
             {
                 var symbol = semantic.GetSymbolInfo(identifier).Symbol;

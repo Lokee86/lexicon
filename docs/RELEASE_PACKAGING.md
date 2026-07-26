@@ -55,6 +55,8 @@ The packaging process must build from a verified source tree. It does not replac
 
 A packaged distribution does not require Go, Cargo, npm, the TypeScript compiler, or a separately installed .NET runtime. The C# adapter is published self-contained for the host operating system and architecture.
 
+The self-contained C# executable can always use file mode without a separate runtime. MSBuild project loading additionally requires a compatible .NET SDK and existing project restore assets on the analysis machine. If those are unavailable, normal `auto` mode falls back to file analysis; `--project-loading msbuild` fails explicitly.
+
 Runtime requirements are:
 
 - operating-system libraries required by the compiled Go and Rust binaries;

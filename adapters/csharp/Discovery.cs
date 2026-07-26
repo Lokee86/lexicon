@@ -5,13 +5,18 @@ using Microsoft.CodeAnalysis.Text;
 internal sealed record SourceDocument(
     string AbsolutePath,
     byte[] Content,
+    CSharpCompilation Compilation,
     string RelativePath,
     SyntaxTree SyntaxTree);
 
 internal sealed record RepositoryModel(
-    CSharpCompilation Compilation,
     IReadOnlyList<SourceDocument> Documents,
-    string Root);
+    int FallbackFileCount,
+    string Mode,
+    int ProjectCount,
+    string Root,
+    string? TargetFramework,
+    IReadOnlyList<string> WorkspaceDiagnostics);
 
 internal static class Discovery
 {
@@ -22,22 +27,83 @@ internal static class Discovery
         "artifacts", "build", "dist", "target", "coverage", "tmp", "temp",
     };
 
-    internal static RepositoryModel Load(string repositoryRoot)
+    internal static async Task<RepositoryModel> LoadAsync(
+        string repositoryRoot,
+        ProjectLoadingMode loadingMode,
+        CancellationToken cancellationToken = default)
     {
         var root = Path.GetFullPath(repositoryRoot);
-        var documents = DiscoverFiles(root)
-            .Select(path => LoadDocument(root, path))
+        if (loadingMode != ProjectLoadingMode.Files)
+        {
+            try
+            {
+                var projectModel = await MsBuildDiscovery.TryLoadAsync(root, cancellationToken);
+                if (projectModel is not null)
+                {
+                    return CompleteProjectModel(root, projectModel);
+                }
+                if (loadingMode == ProjectLoadingMode.MsBuild)
+                {
+                    throw new InvalidOperationException(
+                        "MSBuild project loading was requested but no project graph could be loaded");
+                }
+            }
+            catch (InvalidOperationException) when (loadingMode == ProjectLoadingMode.Auto)
+            {
+                // Project evaluation is optional in auto mode; file loading remains the safe fallback.
+            }
+        }
+
+        return LoadFiles(root);
+    }
+
+    internal static bool IsIgnoredPath(string root, string path)
+    {
+        var relative = Path.GetRelativePath(root, path);
+        return relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(IgnoredDirectories.Contains);
+    }
+
+    private static RepositoryModel LoadFiles(string root)
+    {
+        var provisional = DiscoverFiles(root)
+            .Select(path => LoadSyntax(root, path))
             .OrderBy(document => document.RelativePath, StringComparer.Ordinal)
             .ToArray();
         var compilation = CSharpCompilation.Create(
             assemblyName: "Lexicon.CSharp.Analysis",
-            syntaxTrees: documents.Select(document => document.SyntaxTree),
+            syntaxTrees: provisional.Select(document => document.SyntaxTree),
             references: TrustedPlatformReferences(),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 allowUnsafe: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        return new RepositoryModel(compilation, documents, root);
+        var documents = provisional
+            .Select(document => document with { Compilation = compilation })
+            .ToArray();
+        return new RepositoryModel(documents, 0, "files", 0, root, null, Array.Empty<string>());
+    }
+
+    private static RepositoryModel CompleteProjectModel(string root, RepositoryModel projectModel)
+    {
+        var fallback = LoadFiles(root);
+        var documents = projectModel.Documents.ToDictionary(
+            document => document.RelativePath,
+            StringComparer.Ordinal);
+        var added = 0;
+        foreach (var document in fallback.Documents)
+        {
+            if (documents.TryAdd(document.RelativePath, document))
+            {
+                added++;
+            }
+        }
+        return projectModel with
+        {
+            Documents = documents.Values.OrderBy(document => document.RelativePath, StringComparer.Ordinal).ToArray(),
+            FallbackFileCount = added,
+            Mode = added == 0 ? "msbuild" : "msbuild+files",
+        };
     }
 
     private static IEnumerable<string> DiscoverFiles(string root)
@@ -64,7 +130,7 @@ internal static class Discovery
         }
     }
 
-    private static SourceDocument LoadDocument(string root, string absolutePath)
+    private static SourceDocument LoadSyntax(string root, string absolutePath)
     {
         var content = File.ReadAllBytes(absolutePath);
         var relativePath = Facts.NormalizePath(Path.GetRelativePath(root, absolutePath));
@@ -73,7 +139,7 @@ internal static class Discovery
             text,
             new CSharpParseOptions(LanguageVersion.Preview, DocumentationMode.Parse),
             relativePath);
-        return new SourceDocument(absolutePath, content, relativePath, tree);
+        return new SourceDocument(absolutePath, content, null!, relativePath, tree);
     }
 
     private static IReadOnlyList<MetadataReference> TrustedPlatformReferences()

@@ -16,12 +16,15 @@ From the Lexicon repository root:
 
 ```text
 python evaluation/bootstrap_corpus.py
+python evaluation/prepare_csharp_projects.py
 python evaluation/inventory_workspace.py
 python evaluation/run_tests.py
 python evaluation/run_validation.py --jobs 3
 ```
 
 `bootstrap_corpus.py` restores externally pinned repositories beneath the workspace-level `corpus/` directory at revisions recorded in `corpus.json`.
+
+`prepare_csharp_projects.py` runs explicit MSBuild restore for the trusted pinned C# corpus. It requires the SDK versions requested by those repositories and must not be used on untrusted source trees.
 
 `inventory_workspace.py` reports which configured local corpus repositories and runtimes are currently available.
 
@@ -52,7 +55,7 @@ The Go adapter has a separate dated two-repository record in [`docs/GO_ADAPTER_V
 
 Calibration cases are used to understand and tune language-general behavior. Validation cases protect known realistic behavior. Holdouts provide a separate check against overfitting to calibration repositories.
 
-The C# corpus exercises Roslyn-backed extraction across application, library, and policy-oriented code. Spectre covers calibration of calls, dataflow, dependencies, inheritance, and interface implementation; Dapper protects the validation path for calls, dataflow, and dependencies; Polly is an independent holdout for the same broad relation surface.
+The C# corpus forces restored MSBuild project loading and exercises Roslyn-backed extraction across application, library, and policy-oriented code. Spectre covers calibration of calls, dataflow, dependencies, inheritance, and interface implementation; Dapper protects the validation path for calls, dataflow, and dependencies; Polly is an independent holdout for the same broad relation surface.
 
 C# corpus sources follow the pinned-source convention: each case uses an existing workspace-level checkout under `corpus/cs-*`, and `corpus.json` records the exact Git revision that the checkout must represent. Validation does not float these cases to the current branch tip. Changing a C# source revision is an explicit corpus update that must be reviewed together with its resulting validation evidence.
 
@@ -86,6 +89,7 @@ A successful complete validation may replace `validation/baseline.json`. Focused
 | File | Responsibility |
 | --- | --- |
 | `bootstrap_corpus.py` | Restore pinned external corpus repositories |
+| `prepare_csharp_projects.py` | Restore trusted pinned C# project assets before project-aware validation |
 | `inventory_workspace.py` | Inspect local corpus and runtime availability |
 | `run_tests.py` | Execute the application and adapter test matrix |
 | `run_validation.py` | Execute corpus scans, gates, determinism checks, summaries, and baseline publication |

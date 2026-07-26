@@ -1,9 +1,9 @@
 internal static class Program
 {
-    private const string AdapterVersion = "0.1.0";
+    private const string AdapterVersion = "0.2.0";
     private const string Language = "csharp";
 
-    private static int Main(string[] args)
+    private static async Task<int> Main(string[] args)
     {
         try
         {
@@ -11,7 +11,7 @@ internal static class Program
             var repositoryRoot = ResolveRepositoryRoot(options.Repository);
             var repository = ResolveRepositoryIdentity(repositoryRoot);
             var header = CreateHeader(repository, options);
-            var facts = Analysis.Run(repositoryRoot, repository);
+            var facts = await Analysis.RunAsync(repositoryRoot, repository, options.ProjectLoading);
             WriteOutput(options.Output, facts.EmitJsonl(header));
             return 0;
         }
@@ -20,7 +20,7 @@ internal static class Program
             Console.Error.WriteLine($"error: {error.Message}");
             return 2;
         }
-        catch (IOException error)
+        catch (Exception error) when (error is IOException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {error.Message}");
             return 1;
@@ -128,17 +128,26 @@ internal static class Program
     }
 }
 
+internal enum ProjectLoadingMode
+{
+    Auto,
+    MsBuild,
+    Files,
+}
+
 internal sealed class CommandLineOptions
 {
     private CommandLineOptions(
         string repository,
         string output,
+        ProjectLoadingMode projectLoading,
         IReadOnlyList<string> changedFiles,
         IReadOnlyList<string> removedFiles,
         bool hasIncrementalScope)
     {
         Repository = repository;
         Output = output;
+        ProjectLoading = projectLoading;
         ChangedFiles = changedFiles;
         RemovedFiles = removedFiles;
         HasIncrementalScope = hasIncrementalScope;
@@ -146,6 +155,7 @@ internal sealed class CommandLineOptions
 
     internal string Repository { get; }
     internal string Output { get; }
+    internal ProjectLoadingMode ProjectLoading { get; }
     internal IReadOnlyList<string> ChangedFiles { get; }
     internal IReadOnlyList<string> RemovedFiles { get; }
     internal bool HasIncrementalScope { get; }
@@ -154,6 +164,7 @@ internal sealed class CommandLineOptions
     {
         string? repository = null;
         string? output = null;
+        var projectLoading = ProjectLoadingMode.Auto;
         var changedFiles = new List<string>();
         var removedFiles = new List<string>();
         var hasIncrementalScope = false;
@@ -168,6 +179,9 @@ internal sealed class CommandLineOptions
                     break;
                 case "--output":
                     output = ReadValue(args, ref index, "--output");
+                    break;
+                case "--project-loading":
+                    projectLoading = ParseProjectLoading(ReadValue(args, ref index, "--project-loading"));
                     break;
                 case "--changed-file":
                     changedFiles.Add(ReadValue(args, ref index, "--changed-file"));
@@ -192,7 +206,24 @@ internal sealed class CommandLineOptions
             throw new ArgumentException("--output is required");
         }
 
-        return new CommandLineOptions(repository, output, changedFiles, removedFiles, hasIncrementalScope);
+        return new CommandLineOptions(
+            repository,
+            output,
+            projectLoading,
+            changedFiles,
+            removedFiles,
+            hasIncrementalScope);
+    }
+
+    private static ProjectLoadingMode ParseProjectLoading(string value)
+    {
+        return value.ToLowerInvariant() switch
+        {
+            "auto" => ProjectLoadingMode.Auto,
+            "msbuild" => ProjectLoadingMode.MsBuild,
+            "files" => ProjectLoadingMode.Files,
+            _ => throw new ArgumentException("--project-loading must be auto, msbuild, or files"),
+        };
     }
 
     private static string ReadValue(string[] args, ref int index, string option)

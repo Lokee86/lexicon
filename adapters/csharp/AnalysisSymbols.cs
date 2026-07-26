@@ -25,7 +25,7 @@ internal sealed partial class Analysis
     {
         foreach (var document in model.Documents)
         {
-            var semantic = model.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
+            var semantic = document.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
             foreach (var node in document.SyntaxTree.GetRoot().DescendantNodesAndSelf())
             {
                 if (!IsDeclaration(node))
@@ -86,7 +86,7 @@ internal sealed partial class Analysis
             name,
             path,
             qualifiedName,
-            identity: SymbolIdentity(symbol, location),
+            identity: SymbolIdentity(symbol, location, owner),
             span: location is null ? null : Span(path, location),
             attributes: attributes,
             owner: owner);
@@ -143,16 +143,20 @@ internal sealed partial class Analysis
         return string.IsNullOrWhiteSpace(value) ? symbol.MetadataName : value;
     }
 
-    private static string SymbolIdentity(ISymbol symbol, Location? location)
+    private static string SymbolIdentity(ISymbol symbol, Location? location, string? sourceOwner)
     {
         var identity = QualifiedName(symbol);
         if (symbol is ILocalSymbol or IParameterSymbol)
         {
             var owner = symbol.ContainingSymbol is null ? "" : QualifiedName(symbol.ContainingSymbol);
-            var where = location?.SourceTree is null
+            var where = location is null || string.IsNullOrEmpty(sourceOwner)
                 ? "external"
-                : $"{Facts.NormalizePath(location.SourceTree.FilePath)}:{location.SourceSpan.Start}";
+                : $"{sourceOwner}:{location.SourceSpan.Start}";
             identity = $"{owner}::{symbol.Kind}:{identity}@{where}";
+        }
+        if (location is not null && symbol.ContainingAssembly is { Name.Length: > 0 } assembly)
+        {
+            identity = $"{assembly.Name}::{identity}";
         }
         return identity;
     }

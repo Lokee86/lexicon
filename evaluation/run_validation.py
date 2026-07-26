@@ -131,8 +131,15 @@ def build_adapters(root: Path, adapters: set[str]) -> None:
         )
 
 
-def adapter_command(root: Path, adapter: str, repository: Path, output: Path) -> tuple[list[str], dict[str, str]]:
+def adapter_command(
+    root: Path,
+    adapter: str,
+    repository: Path,
+    output: Path,
+    extra_args: list[str] | None = None,
+) -> tuple[list[str], dict[str, str]]:
     env = os.environ.copy()
+    extra_args = extra_args or []
     if adapter == "python":
         env["PYTHONPATH"] = str(root / "adapters" / "python")
         return [sys.executable, "-m", "lexicon_python", "--repo", str(repository), "--output", str(output)], env
@@ -151,8 +158,13 @@ def adapter_command(root: Path, adapter: str, repository: Path, output: Path) ->
         binary = root / "adapters" / "rust" / "target" / "release" / ("lexicon-rust-adapter.exe" if os.name == "nt" else "lexicon-rust-adapter")
         return [str(binary), "--repo", str(repository), "--output", str(output)], env
     if adapter == "csharp":
+        configured = env.get("LEXICON_DOTNET")
+        if configured and Path(configured).is_file():
+            dotnet_root = str(Path(configured).resolve().parent)
+            env["DOTNET_ROOT"] = dotnet_root
+            env["PATH"] = dotnet_root + os.pathsep + env.get("PATH", "")
         binary = root / "evaluation" / "bin" / "csharp" / ("lexicon-csharp.exe" if os.name == "nt" else "lexicon-csharp")
-        return [str(binary), "--repo", str(repository), "--output", str(output)], env
+        return [str(binary), "--repo", str(repository), "--output", str(output), *extra_args], env
     raise ValueError(f"unsupported adapter: {adapter}")
 
 
@@ -173,6 +185,14 @@ def summarize(path: Path) -> dict[str, Any]:
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     header = records[0]
     nodes = {record["id"]: record for record in records[1:] if record["record"] == "node"}
+    repository_node = next(
+        (
+            record
+            for record in nodes.values()
+            if record.get("kind") == "repository"
+        ),
+        None,
+    )
     node_counts: Counter[str] = Counter()
     edge_counts: Counter[str] = Counter()
     unresolved_counts: Counter[str] = Counter()
@@ -216,6 +236,7 @@ def summarize(path: Path) -> dict[str, Any]:
         "language": header["language"],
         "node_kinds": dict(sorted(node_counts.items())),
         "repository": header["repository"],
+        "repository_attributes": (repository_node or {}).get("attributes", {}),
         "samples": samples,
         "unresolved_reasons": dict(sorted(unresolved_reasons.items())),
         "unresolved_relations": dict(sorted(unresolved_counts.items())),
@@ -235,7 +256,13 @@ def validate_case(root: Path, workspace: Path, output_root: Path, case: dict[str
     outputs: list[Path] = []
     for run_number in (1, 2):
         output = case_dir / f"run{run_number}.jsonl"
-        command, env = adapter_command(root, case["adapter"], repository, output)
+        command, env = adapter_command(
+            root,
+            case["adapter"],
+            repository,
+            output,
+            case.get("adapter_args"),
+        )
         started = time.perf_counter()
         run(command, root, env)
         durations.append(round(time.perf_counter() - started, 6))
@@ -276,6 +303,13 @@ def validate_case(root: Path, workspace: Path, output_root: Path, case: dict[str
     return result
 
 
+def corpus_workspace(root: Path) -> Path:
+    for candidate in (root.parent, *root.parents):
+        if (candidate / "corpus").is_dir():
+            return candidate
+    return root.parent
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--adapter", action="append", choices=("python", "ruby", "typescript", "gdscript", "rust", "csharp"))
@@ -284,7 +318,7 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
-    workspace = root.parent
+    workspace = corpus_workspace(root)
     manifest = json.loads((Path(__file__).with_name("corpus.json")).read_text(encoding="utf-8"))
     cases = manifest["cases"]
     if args.adapter:

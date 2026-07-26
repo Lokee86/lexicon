@@ -135,6 +135,7 @@ Restore externally pinned corpus inputs when required:
 
 ```text
 python evaluation/bootstrap_corpus.py
+python evaluation/prepare_csharp_projects.py
 ```
 
 Run the full corpus:

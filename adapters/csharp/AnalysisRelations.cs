@@ -8,7 +8,7 @@ internal sealed partial class Analysis
     {
         foreach (var document in model.Documents)
         {
-            var semantic = model.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
+            var semantic = document.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
             var root = document.SyntaxTree.GetRoot();
             foreach (var directive in root.DescendantNodes().OfType<UsingDirectiveSyntax>())
             {
@@ -74,7 +74,7 @@ internal sealed partial class Analysis
     {
         foreach (var document in model.Documents)
         {
-            var semantic = model.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
+            var semantic = document.Compilation.GetSemanticModel(document.SyntaxTree, ignoreAccessibility: true);
             foreach (var node in document.SyntaxTree.GetRoot().DescendantNodes())
             {
                 if (node is not InvocationExpressionSyntax and not ObjectCreationExpressionSyntax and
