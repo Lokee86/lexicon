@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -42,8 +43,33 @@ def npm_command(*args: str) -> list[str]:
 
 
 def dotnet_command(*args: str) -> list[str]:
+    configured = os.environ.get("LEXICON_DOTNET")
+    if configured:
+        if not Path(configured).is_file():
+            raise FileNotFoundError(f"LEXICON_DOTNET does not exist: {configured}")
+        return [configured, *args]
     dotnet = executable("dotnet", Path("C:/Program Files/dotnet/dotnet.exe"))
     return [dotnet, *args]
+
+
+def dotnet_runtime_identifier() -> str:
+    architecture = platform.machine().lower()
+    if architecture in {"amd64", "x86_64"}:
+        architecture = "x64"
+    elif architecture in {"arm64", "aarch64"}:
+        architecture = "arm64"
+    else:
+        raise RuntimeError(f"unsupported .NET architecture: {architecture}")
+
+    if sys.platform == "win32":
+        operating_system = "win"
+    elif sys.platform == "darwin":
+        operating_system = "osx"
+    elif sys.platform.startswith("linux"):
+        operating_system = "linux"
+    else:
+        raise RuntimeError(f"unsupported .NET platform: {sys.platform}")
+    return f"{operating_system}-{architecture}"
 
 
 def run(command: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
@@ -91,7 +117,9 @@ def build_adapters(root: Path, adapters: set[str]) -> None:
                 "--output",
                 str(output),
                 "--self-contained",
-                "false",
+                "true",
+                "--runtime",
+                dotnet_runtime_identifier(),
                 "-p:AssemblyName=lexicon-csharp",
                 "-p:ContinuousIntegrationBuild=true",
                 "-p:DebugSymbols=false",

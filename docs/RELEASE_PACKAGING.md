@@ -28,6 +28,7 @@ The release directory contains:
 - `adapters/go/lexicon-go`;
 - `adapters/gdscript/lexicon-gdscript`;
 - `adapters/generic/lexicon-generic`;
+- the host-specific self-contained C# adapter under `adapters/csharp/`;
 - `adapters/rust/lexicon-rust`;
 - the compiled TypeScript `dist/cli.js`;
 - TypeScript production package metadata and runtime dependencies;
@@ -45,13 +46,14 @@ Creating a complete distribution requires:
 - Go for the application, Go adapter, GDScript adapter, and generic adapter;
 - Rust and Cargo for the Rust adapter;
 - Node.js and npm for TypeScript compilation and production dependency installation;
+- a .NET 8 SDK for the self-contained C# adapter publish;
 - Python to run the packaging script.
 
 The packaging process must build from a verified source tree. It does not replace the repository test matrix.
 
 ## Runtime requirements
 
-A packaged distribution does not require Go, Cargo, npm, or the TypeScript compiler.
+A packaged distribution does not require Go, Cargo, npm, the TypeScript compiler, or a separately installed .NET runtime. The C# adapter is published self-contained for the host operating system and architecture.
 
 Runtime requirements are:
 

@@ -1,6 +1,6 @@
 # Lexicon current status
 
-Status date: July 23, 2026.
+Status date: July 25, 2026.
 
 This document describes the implementation currently present on `main`. Dated validation reports record evidence from specific runs and should not be treated as permanent performance guarantees.
 
@@ -32,6 +32,7 @@ The primary execution model remains one-shot CLI operations. Watch mode invokes 
 | Adapter | Version | Implemented semantic scope | Principal limits |
 | --- | ---: | --- | --- |
 | Go | 0.1.0 | Multi-module discovery, packages, types, calls, closures, interfaces, implementations, overrides, dataflow, dependencies, SSA/VTA possible dispatch | Reflection, plugins, cgo/assembly, generated runtime behavior, and exact call-site graph retention |
+| C# | 0.1.0 | Roslyn-backed repositories, namespaces, types, interfaces, methods, constructors, calls, candidate calls, inheritance, implementations, overrides, dataflow, and dependencies | MSBuild project graphs, NuGet/project reference loading, source generators, conditional project configurations, and runtime reflection |
 | GDScript | 0.3.0 | Godot project scoping, classes, inheritance, autoloads, callbacks, bounded type flow, calls, possible calls, dataflow, dependencies | Scene-tree-only type evidence, engine internals, runtime script replacement, computed dispatch and resource paths |
 | Python | 0.3.0 | Imports, lexical scopes, inheritance, protocols, callbacks, callable flow, C3 lookup, dataflow, dependencies | Monkey patching, metaclasses, dynamic imports/reflection, framework injection without ordinary value-flow evidence |
 | Ruby | 0.3.0 | Reopened owners, inheritance, mixins, blocks, callbacks, bounded Rails-aware flow, dataflow, dependencies | Open runtime mutation, `send`/`eval`, refinements, dynamic constants, framework-generated behavior without declarations |
@@ -102,13 +103,14 @@ Current acceptance mechanisms include:
 - byte-for-byte repeat-run comparison;
 - positive and expected-negative relation gates;
 - real-repository corpus cases across GDScript, Python, Ruby, Rust, TypeScript, JavaScript, and Svelte;
-- separate dated Go real-repository validation.
+- separate dated Go and C# real-repository validation.
 
 See:
 
 - [Semantic acceptance gates](SEMANTIC_ACCEPTANCE.md)
 - [Cross-adapter corpus validation](SEMANTIC_CORPUS_VALIDATION.md)
 - [Go adapter validation](GO_ADAPTER_VALIDATION.md)
+- [C# adapter validation](CSHARP_ADAPTER_VALIDATION.md)
 - [Evaluation harness](../evaluation/README.md)
 
 ## Explicit non-claims

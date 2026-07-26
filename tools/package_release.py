@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -47,6 +48,11 @@ def cargo_executable() -> str:
 
 
 def dotnet_executable() -> str:
+    configured = os.environ.get("LEXICON_DOTNET")
+    if configured:
+        if not Path(configured).is_file():
+            raise FileNotFoundError(f"LEXICON_DOTNET does not exist: {configured}")
+        return configured
     found = shutil.which("dotnet")
     if found:
         return found
@@ -58,6 +64,26 @@ def dotnet_executable() -> str:
         if candidate.is_file():
             return str(candidate)
     raise FileNotFoundError("dotnet executable not found")
+
+
+def dotnet_runtime_identifier() -> str:
+    architecture = platform.machine().lower()
+    if architecture in {"amd64", "x86_64"}:
+        architecture = "x64"
+    elif architecture in {"arm64", "aarch64"}:
+        architecture = "arm64"
+    else:
+        raise RuntimeError(f"unsupported .NET architecture: {architecture}")
+
+    if sys.platform == "win32":
+        operating_system = "win"
+    elif sys.platform == "darwin":
+        operating_system = "osx"
+    elif sys.platform.startswith("linux"):
+        operating_system = "linux"
+    else:
+        raise RuntimeError(f"unsupported .NET platform: {sys.platform}")
+    return f"{operating_system}-{architecture}"
 
 
 def copy_file(source: Path, destination: Path) -> None:
@@ -117,7 +143,9 @@ def build_csharp(repo: Path, output: Path) -> None:
                 "--output",
                 str(publish),
                 "--self-contained",
-                "false",
+                "true",
+                "--runtime",
+                dotnet_runtime_identifier(),
                 "-p:AssemblyName=lexicon-csharp",
                 "-p:ContinuousIntegrationBuild=true",
                 "-p:DebugSymbols=false",
