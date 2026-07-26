@@ -33,8 +33,8 @@ The primary execution model remains one-shot CLI operations. Watch mode invokes 
 | --- | ---: | --- | --- |
 | Go | 0.1.0 | Multi-module discovery, packages, types, calls, closures, interfaces, implementations, overrides, dataflow, dependencies, SSA/VTA possible dispatch | Reflection, plugins, cgo/assembly, generated runtime behavior, and exact call-site graph retention |
 | C# | 0.2.0 | Roslyn and restored MSBuild project graphs, project/package references, namespaces, types, interfaces, calls, candidate calls, inheritance, implementations, overrides, dataflow, dependencies, and conservative missing-file fallback | Requires compatible SDK and restore assets for project mode; does not guarantee source-generator coverage, runtime reflection, application behavior, or exhaustive conditional configurations |
-| Java | 0.1.0 | Deterministic source discovery, packages/imports, classes/interfaces/enums/records/annotations, members and parameters, repository-local inheritance/implementation/permits and annotation resolution, conservative calls/possible calls/overrides/dataflow, and literal Maven/Gradle dependency evidence | No javac attribution, classpath or module-path resolution, annotation processing, generated-code expansion, local/anonymous-class model, build evaluation, reflection, or runtime dispatch |
-| Kotlin | 0.1.0 | Deterministic source discovery, packages/imports, classes/interfaces/objects/companions/enums and Kotlin modifiers, members/properties/parameters, repository-local supertypes/delegation and annotation resolution, conservative calls/possible calls/overrides/dataflow, and literal Gradle/Maven dependency evidence | No Kotlin compiler or Gradle model, default-import or type-alias expansion, source-set/plugin/generated-code semantics, delegated-property execution, reflection, or runtime dispatch |
+| Java | 0.2.0 | Deterministic source discovery, packages/imports, classes/interfaces/enums/records/annotations, members and parameters, repository-local inheritance/implementation/permits and annotation resolution, conservative calls through same-owner/static/constructor and explicitly typed parameter or simple-local receivers, possible calls, overrides, dataflow, and literal Maven/Gradle dependency evidence | No javac attribution, argument-type overload selection, inherited receiver dispatch, classpath or module-path resolution, annotation processing, generated-code expansion, local/anonymous-class model, build evaluation, reflection, or runtime dispatch |
+| Kotlin | 0.4.0 | Deterministic source discovery, packages/imports, classes/interfaces/objects/companions/enums and Kotlin modifiers, members/properties/parameters, repository-local supertypes/delegation and annotation resolution, conservative calls including explicitly typed repository-local extension receivers, possible calls, overrides, dataflow, and literal Gradle/Maven dependency evidence | No Kotlin compiler or Gradle model, inferred/safe/chained extension binding, default-import or type-alias expansion, source-set/plugin/generated-code semantics, delegated-property execution, reflection, or runtime dispatch |
 | GDScript | 0.3.0 | Godot project scoping, classes, inheritance, autoloads, callbacks, bounded type flow, calls, possible calls, dataflow, dependencies | Scene-tree-only type evidence, engine internals, runtime script replacement, computed dispatch and resource paths |
 | Python | 0.3.0 | Imports, lexical scopes, inheritance, protocols, callbacks, callable flow, C3 lookup, dataflow, dependencies | Monkey patching, metaclasses, dynamic imports/reflection, framework injection without ordinary value-flow evidence |
 | Ruby | 0.3.0 | Reopened owners, inheritance, mixins, blocks, callbacks, bounded Rails-aware flow, dataflow, dependencies | Open runtime mutation, `send`/`eval`, refinements, dynamic constants, framework-generated behavior without declarations |
@@ -104,9 +104,9 @@ Current acceptance mechanisms include:
 - semantic relation reports;
 - byte-for-byte repeat-run comparison;
 - positive and expected-negative relation gates;
-- real-repository corpus cases across GDScript, Python, Ruby, Rust, TypeScript, JavaScript, and Svelte;
+- real-repository corpus cases across GDScript, Python, Ruby, Rust, TypeScript, JavaScript, Svelte, Java, and Kotlin;
 - fixture, race, contract, and byte-determinism validation for Java and Kotlin;
-- separate dated Go and C# real-repository validation.
+- separate dated Go, C#, and JVM real-repository validation.
 
 See:
 
@@ -115,6 +115,7 @@ See:
 - [Go adapter validation](GO_ADAPTER_VALIDATION.md)
 - [C# adapter validation](CSHARP_ADAPTER_VALIDATION.md)
 - [Java and Kotlin adapter validation](JVM_ADAPTER_VALIDATION.md)
+- [Java and Kotlin corpus calibration](JVM_CORPUS_CALIBRATION.md)
 - [Evaluation harness](../evaluation/README.md)
 
 ## Explicit non-claims

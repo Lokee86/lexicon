@@ -39,19 +39,35 @@ Every accepted case completed two scans, passed facts-v1 validation, emitted byt
 
 The Now in Android dependency result is expected under the current literal manifest boundary: its build relies heavily on version catalogs, project dependencies, convention plugins, and generated/KSP surfaces, which remain unresolved rather than guessed.
 
-## First calibration priorities
+## First calibration results
+
+The first Java and Kotlin calibration slices were implemented and rerun across all six accepted repositories. Every changed stream remained deterministic and passed facts-v1 validation.
 
 ### Java typed receiver resolution
 
-The largest recurring useful Java gap is a repository-local instance call made through a typed parameter or local variable. Examples in jsoup include calls shaped like `doc.head()`, `head.selectFirst(...)`, and `style.html()`. Their receiver declarations provide repository-local types, but the current runtime pass classifies them as dynamic.
+Java adapter `0.2.0` now resolves calls through explicitly typed callable parameters and simple declaration-before-use local identifiers. Receiver types use the existing package/import/lexical rules. Only directly declared, non-static repository-local methods are considered; inherited, external, ambiguous, chained, inferred, and otherwise unsupported receivers remain unresolved.
 
-The first Java calibration slice should index conservative parameter and local-declaration types, resolve the receiver type through existing import/package rules, and emit a call only when name and arity leave one repository-local method target. Ambiguous overloads must remain `possible-calls`; external collection and framework receivers must remain unresolved.
+| Case | Definite calls | Possible calls | Unresolved calls |
+| --- | ---: | ---: | ---: |
+| jsoup | +3,621 | +975 | -4,089 |
+| Gson | +2,448 | +5,423 | -3,345 |
+| HikariCP | +844 | +4 | -846 |
+
+Audit samples included `Document.head()`, `Element.text()`, `Element.html()`, `JsonWriter.beginArray()`, and `JsonWriter.endArray()`. The large Gson `possible-calls` increase is caused by same-arity overload families such as `JsonWriter.value(...)`. Those edges are explicitly uncertain rather than definite, but the fan-out is now the primary Java semantic-noise target. The next Java calibration slice should use conservative argument-type evidence to narrow obvious literal and explicitly typed identifier arguments without attempting compiler-equivalent overload resolution.
 
 ### Kotlin extension and receiver resolution
 
-The largest recurring useful Kotlin gap is repository-local extension or typed-receiver binding inside fluent expressions. detekt exposes calls shaped like `location.toIssue(basePath)`, `subject.lint(code)`, and nested receiver calls. Some are external standard-library or assertion APIs, but others are repository-local extensions that the adapter can conservatively prove.
+Kotlin adapter `0.4.0` now resolves repository-local extension calls through explicitly typed parameter, local, and property identifiers. Visibility follows lexical member extensions, aliases, explicit imports, same-package declarations, and wildcard imports. Ordinary members win over extensions; inferred, external, safe-call, chained, and fluent-result receivers remain unresolved.
 
-The first Kotlin calibration slice should distinguish repository-local extension functions from standard-library and third-party receivers, resolve explicit receiver types where the source proves them, and avoid treating nested external fluent calls as local merely because their names match.
+| Case | Definite calls | Possible calls | Unresolved calls |
+| --- | ---: | ---: | ---: |
+| detekt | +8 | 0 | -8 |
+| kotlinx.coroutines | +10 | 0 | -10 |
+| Now in Android | +1 | 0 | -1 |
+
+All 19 additions were audited as concrete repository-local bindings. Examples include `createKtFile(...)`, `getDefaultConfiguration()`, `createSpec(...)`, `list(...)`, and `listOfMaps(...)`. No holdout-only relaxation or name-only fallback was added.
+
+## Remaining priorities
 
 ### Java scalability
 
