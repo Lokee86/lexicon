@@ -30,10 +30,40 @@ func TestRuntimeCallsResolveDefinitePossibleAndExternalTargets(t *testing.T) {
 		assertRuntimeEdge(t, records, nodes, caller, target, "possible-calls")
 	}
 
-	assertRuntimeUnresolved(t, records, nodes, caller, "calls", "external.run()", "dynamic-target")
+	assertRuntimeUnresolved(t, records, nodes, caller, "calls", "external.run()", "external-target")
 	assertRuntimeUnresolved(t, records, nodes, caller, "calls", "missing(value)", "dynamic-target")
 	assertRuntimeUnresolved(t, records, nodes, caller, "calls", "vendor.External.staticCall()", "external-target")
 	assertRuntimeUnresolved(t, records, nodes, caller, "calls", "new vendor.External(value)", "external-target")
+}
+
+func TestTypedIdentifierReceiverCallsStayBoundedAndScoped(t *testing.T) {
+	records := decodeRecords(t, analyzeFixture(t, runtimeFixture))
+	nodes := nodeIndex(records)
+	target := "demo.receivers.ReceiverTarget.unique(int)"
+
+	assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", target, "calls")
+	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", "calls", "receiver.inherited()", "unsupported-form")
+	assertNoRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", "demo.receivers.ReceiverBase.inherited()", "calls")
+	assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.local()", target, "calls")
+	for _, overload := range []string{
+		"demo.receivers.ReceiverTarget.overloaded(int)",
+		"demo.receivers.ReceiverTarget.overloaded(String)",
+	} {
+		assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.overloaded(ReceiverTarget)", overload, "possible-calls")
+	}
+
+	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.external(vendor.External)", "calls", "receiver.run()", "external-target")
+	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.ambiguous(SharedReceiver)", "calls", "receiver.run()", "ambiguous-target")
+
+	scope := "demo.receivers.ReceiverCalls.scope()"
+	assertRuntimeEdge(t, records, nodes, scope, target, "calls")
+	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "future.unique(1)", "dynamic-target")
+	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "inner.unique(1)", "dynamic-target")
+	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "ReceiverTarget.staticOnly()", "unsupported-form")
+	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "unique(1)", "dynamic-target")
+	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "unknown.unique(1)", "dynamic-target")
+	assertNoRuntimeEdge(t, records, nodes, scope, "demo.receivers.ReceiverTarget.staticOnly()", "calls")
+	assertAllEndpoints(t, records, nodes)
 }
 
 func TestRuntimeConstructorCallsAndOverrides(t *testing.T) {

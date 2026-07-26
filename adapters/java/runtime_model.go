@@ -6,22 +6,23 @@ import (
 )
 
 type callableDeclaration struct {
-	arity              int
-	bodyEnd            int
-	bodyStart          int
-	constructor        bool
-	context            resolutionContext
-	id                 string
-	modifiers          []string
-	name               string
-	ownerID            string
-	ownerQualifiedName string
-	parameterIDs       map[string]string
-	parameterTypes     []string
-	path               string
-	signature          string
-	source             string
-	tokens             []token
+	arity                  int
+	bodyEnd                int
+	bodyStart              int
+	constructor            bool
+	context                resolutionContext
+	id                     string
+	modifiers              []string
+	name                   string
+	ownerID                string
+	ownerQualifiedName     string
+	parameterIDs           map[string]string
+	parameterReceiverTypes map[string]string
+	parameterTypes         []string
+	path                   string
+	signature              string
+	source                 string
+	tokens                 []token
 }
 
 type fieldDeclaration struct {
@@ -87,6 +88,16 @@ func (state *analysisState) callableCandidates(ownerID, name string, arity int, 
 		result = append(result, declaration)
 	}
 	sort.Slice(result, func(left, right int) bool { return result[left].id < result[right].id })
+	return result
+}
+
+func (state *analysisState) instanceCallableCandidates(ownerID, name string, arity int) []callableDeclaration {
+	var result []callableDeclaration
+	for _, declaration := range state.callableCandidates(ownerID, name, arity, false, false) {
+		if !hasModifier(declaration.modifiers, "static") {
+			result = append(result, declaration)
+		}
+	}
 	return result
 }
 

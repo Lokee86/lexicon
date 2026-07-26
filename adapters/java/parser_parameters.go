@@ -1,11 +1,12 @@
 package main
 
 type parameterDeclaration struct {
-	end      int
-	name     string
-	start    int
-	typeName string
-	varargs  bool
+	end          int
+	name         string
+	receiverType string
+	start        int
+	typeName     string
+	varargs      bool
 }
 
 func parseParameters(tokens []token, start, end int) []parameterDeclaration {
@@ -31,7 +32,9 @@ func parseParameters(tokens []token, start, end int) []parameterDeclaration {
 			return nil
 		}
 		result = append(result, parameterDeclaration{
-			end: segment[1], name: tokens[nameIndex].text, start: segment[0], typeName: typeName,
+			end: segment[1], name: tokens[nameIndex].text,
+			receiverType: receiverDeclaredType(tokens, core, nameIndex),
+			start:        segment[0], typeName: typeName,
 			varargs: containsToken(tokens, core, nameIndex, "..."),
 		})
 	}

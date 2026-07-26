@@ -2,7 +2,6 @@ package main
 
 import (
 	"sort"
-	"strings"
 )
 
 type invocationEvidence struct {
@@ -22,6 +21,7 @@ var nonCallKeywords = map[string]bool{
 
 func (state *analysisState) emitCalls(callable *callableDeclaration) {
 	ignored := ignoredRuntimeTokens(callable)
+	receivers := collectReceiverTypes(callable, ignored)
 	for index := callable.bodyStart; index < callable.bodyEnd; index++ {
 		if ignored[index] {
 			continue
@@ -30,7 +30,7 @@ func (state *analysisState) emitCalls(callable *callableDeclaration) {
 		if !ok {
 			continue
 		}
-		state.emitInvocation(callable, invocation)
+		state.emitInvocation(callable, invocation, receivers)
 	}
 }
 
@@ -94,7 +94,7 @@ func qualifiedChainStart(tokens []token, end int) int {
 	return start
 }
 
-func (state *analysisState) emitInvocation(callable *callableDeclaration, invocation invocationEvidence) {
+func (state *analysisState) emitInvocation(callable *callableDeclaration, invocation invocationEvidence, receivers receiverTypes) {
 	attributes := map[string]any{"arity": invocation.arity, "invocation_kind": invocation.kind}
 	invocationSpan := runtimeSpan(callable.path, callable.tokens, invocation.start, invocation.end)
 	if invocation.kind == "unsupported" {
@@ -107,28 +107,7 @@ func (state *analysisState) emitInvocation(callable *callableDeclaration, invoca
 	case "unqualified":
 		candidates = state.callableCandidates(callable.ownerID, invocation.name, invocation.arity, false, false)
 	case "qualified":
-		if invocation.qualifier == "this" {
-			candidates = state.callableCandidates(callable.ownerID, invocation.name, invocation.arity, false, false)
-			break
-		}
-		_, localNames := localDeclarations(callable, ignoredRuntimeTokens(callable))
-		root := invocation.qualifier
-		if dot := strings.Index(root, "."); dot >= 0 {
-			root = root[:dot]
-		}
-		if callable.parameterIDs[root] != "" || localNames[root] {
-			reason = "dynamic-target"
-			break
-		}
-		types := state.resolveTypeDeclarations(invocation.qualifier, callable.ownerQualifiedName, callable.context)
-		if len(types) == 0 {
-			reason = "external-target"
-		} else if len(types) > 1 {
-			reason = "ambiguous-target"
-		} else {
-			candidates = state.callableCandidates(types[0].id, invocation.name, invocation.arity, false, true)
-			reason = "unsupported-form"
-		}
+		candidates, reason = state.qualifiedCallCandidates(callable, invocation, receivers)
 	case "constructor":
 		types := state.resolveTypeDeclarations(invocation.qualifier, callable.ownerQualifiedName, callable.context)
 		if len(types) == 0 {

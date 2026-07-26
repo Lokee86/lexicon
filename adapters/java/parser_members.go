@@ -115,6 +115,7 @@ func (parser *javaParser) parseCallable(ownerID, ownerQualifiedName, ownerName s
 	parser.facts.addEdge(ownerID, id, "contains", parser.path, callableSpan, nil)
 	parser.queueAnnotations(id, ownerQualifiedName, start, core)
 	parameterIDs := make(map[string]string, len(parameters))
+	parameterReceiverTypes := make(map[string]string, len(parameters))
 	for index, parameter := range parameters {
 		parameterQualifiedName := qualifiedName + "#parameter:" + decimal(index) + ":" + parameter.name
 		parameterSpan := parser.tokenSpan(parameter.start, parameter.end)
@@ -123,6 +124,7 @@ func (parser *javaParser) parseCallable(ownerID, ownerQualifiedName, ownerName s
 		}, "")
 		parser.state.registerDeclaration(parameterQualifiedName, parameterID)
 		parameterIDs[parameter.name] = parameterID
+		parameterReceiverTypes[parameter.name] = parameter.receiverType
 		parser.facts.addEdge(id, parameterID, "contains", parser.path, parameterSpan, nil)
 		parameterCore := skipPrefix(parser.tokens, parameter.start, parameter.end)
 		parser.queueAnnotations(parameterID, ownerQualifiedName, parameter.start, parameterCore)
@@ -135,7 +137,8 @@ func (parser *javaParser) parseCallable(ownerID, ownerQualifiedName, ownerName s
 		arity: len(parameterTypes), bodyEnd: bodyEnd, bodyStart: bodyStart, constructor: constructor,
 		context: parser.resolution.clone(), id: id, modifiers: modifiers, name: name,
 		ownerID: ownerID, ownerQualifiedName: ownerQualifiedName, parameterIDs: parameterIDs,
-		parameterTypes: append([]string(nil), parameterTypes...), path: parser.path,
+		parameterReceiverTypes: parameterReceiverTypes,
+		parameterTypes:         append([]string(nil), parameterTypes...), path: parser.path,
 		signature: signature, source: parser.source, tokens: parser.tokens,
 	})
 	return true
