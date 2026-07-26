@@ -105,7 +105,8 @@ func (parser *javaParser) parseCallable(ownerID, ownerQualifiedName, ownerName s
 		}
 		attributes["return_type"] = returnType
 	}
-	if modifiers := modifierList(parser.tokens, start, core); len(modifiers) != 0 {
+	modifiers := modifierList(parser.tokens, start, core)
+	if len(modifiers) != 0 {
 		attributes["modifiers"] = modifiers
 	}
 	callableSpan := parser.tokenSpan(core, declarationEnd)
@@ -113,6 +114,7 @@ func (parser *javaParser) parseCallable(ownerID, ownerQualifiedName, ownerName s
 	parser.state.registerDeclaration(qualifiedName, id)
 	parser.facts.addEdge(ownerID, id, "contains", parser.path, callableSpan, nil)
 	parser.queueAnnotations(id, ownerQualifiedName, start, core)
+	parameterIDs := make(map[string]string, len(parameters))
 	for index, parameter := range parameters {
 		parameterQualifiedName := qualifiedName + "#parameter:" + decimal(index) + ":" + parameter.name
 		parameterSpan := parser.tokenSpan(parameter.start, parameter.end)
@@ -120,10 +122,22 @@ func (parser *javaParser) parseCallable(ownerID, ownerQualifiedName, ownerName s
 			"index": index, "type": parameter.typeName, "varargs": parameter.varargs,
 		}, "")
 		parser.state.registerDeclaration(parameterQualifiedName, parameterID)
+		parameterIDs[parameter.name] = parameterID
 		parser.facts.addEdge(id, parameterID, "contains", parser.path, parameterSpan, nil)
 		parameterCore := skipPrefix(parser.tokens, parameter.start, parameter.end)
 		parser.queueAnnotations(parameterID, ownerQualifiedName, parameter.start, parameterCore)
 	}
+	bodyStart, bodyEnd := -1, -1
+	if headerEnd < declarationEnd && parser.tokens[headerEnd].text == "{" {
+		bodyStart, bodyEnd = headerEnd+1, declarationEnd-1
+	}
+	parser.state.registerCallable(callableDeclaration{
+		arity: len(parameterTypes), bodyEnd: bodyEnd, bodyStart: bodyStart, constructor: constructor,
+		context: parser.resolution.clone(), id: id, modifiers: modifiers, name: name,
+		ownerID: ownerID, ownerQualifiedName: ownerQualifiedName, parameterIDs: parameterIDs,
+		parameterTypes: append([]string(nil), parameterTypes...), path: parser.path,
+		signature: signature, source: parser.source, tokens: parser.tokens,
+	})
 	return true
 }
 
@@ -156,6 +170,7 @@ func (parser *javaParser) parseFields(ownerID, ownerQualifiedName string, start,
 		fieldSpan := parser.tokenSpan(segment[0], segment[1])
 		id := parser.facts.addNode("field", name, parser.path, qualifiedName, qualifiedName, parser.path, fieldSpan, attributes, "")
 		parser.state.registerDeclaration(qualifiedName, id)
+		parser.state.registerField(fieldDeclaration{id: id, modifiers: modifiers, name: name, ownerID: ownerID})
 		parser.facts.addEdge(ownerID, id, "contains", parser.path, fieldSpan, map[string]any{"declarator_index": index})
 		parser.queueAnnotations(id, ownerQualifiedName, start, core)
 	}
@@ -186,6 +201,7 @@ func (parser *javaParser) parseRecordComponents(ownerID, ownerQualifiedName stri
 			"declaration_kind": "record-component", "index": index, "type": component.typeName,
 		}, "")
 		parser.state.registerDeclaration(qualifiedName, id)
+		parser.state.registerField(fieldDeclaration{id: id, name: component.name, ownerID: ownerID})
 		parser.facts.addEdge(ownerID, id, "contains", parser.path, componentSpan, nil)
 		componentCore := skipPrefix(parser.tokens, component.start, component.end)
 		parser.queueAnnotations(id, ownerQualifiedName, component.start, componentCore)

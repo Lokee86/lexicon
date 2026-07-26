@@ -40,7 +40,12 @@ The foundation models:
 - declared `extends` and `implements` relationships from type headers;
 - sealed-type `permits` references marked with `role: permitted-subtype`;
 - annotation applications on modeled declarations;
-- explicit unresolved relationship, `imports`, or `defines` evidence rather than guessed targets.
+- retained callable-body token ranges for modeled methods and constructors with bodies;
+- definite same-owner, explicit repository-type-qualified static, object-construction, and explicit `this`/`super` constructor calls when name/arity lookup has one repository-local target;
+- `possible-calls` edges for the repository-local overloads that remain when name/arity lookup has multiple sound targets;
+- conservative direct-parent `overrides` edges for methods with identical declared names and normalized parameter signatures;
+- simple modeled field and parameter `reads`/`writes`, including assignment and increment/decrement writes;
+- explicit unresolved relationship, `imports`, `defines`, `calls`, `reads`, or `writes` evidence rather than guessed targets.
 
 Classes, enums, and records use the common `type` node kind. Interfaces and annotation declarations use `interface`. Their exact Java surface is retained in `attributes.declaration_kind`. Record components use `field` with `declaration_kind: record-component`. Parameters preserve source order through their index and parent callable identity.
 
@@ -49,6 +54,12 @@ Import nodes are defined by their compilation-unit module. An import node emits 
 Declared type-header references resolve only to repository-local type declarations. The resolver considers an exact qualified name, the compilation unit's package, explicit non-static imports, non-static wildcard imports, and enclosing lexical type owners. It emits an edge only when the resulting target is unique; absent and ambiguous targets remain `external-target` and `ambiguous-target` unresolved records. `extends` clauses emit `extends`, `implements` clauses emit `implements`, and `permits` clauses emit `references` with `role: permitted-subtype` from the sealed declaration to the permitted declaration.
 
 Annotations on modeled types, constructors, methods, fields, record components, and parameters use the same conservative lookup. A uniquely resolved repository-local annotation declaration is the target of an `annotates` edge from the annotated declaration. External annotations and ambiguous local annotation names remain unresolved `annotates` evidence, preserving the source expression and span.
+
+Callable bodies are retained internally as half-open token ranges and scanned without javac attribution. An unqualified call or `this.method(...)` considers only methods declared on the same modeled owner with a matching name and accepted arity. `Type.method(...)` considers static methods only after `Type` uniquely resolves to a repository-local declaration. `new Type(...)`, `this(...)`, and `super(...)` similarly consider only modeled constructors with an accepted arity; `super(...)` requires one resolved direct superclass. One candidate emits `calls`; multiple overload candidates emit one `possible-calls` edge per candidate. External types, dynamic receivers, inherited/otherwise unsupported lookup, malformed calls, and ambiguous type names remain unresolved `calls` evidence rather than guessed edges.
+
+A modeled non-static, non-private method emits `overrides` to matching methods on each uniquely resolved direct superclass or interface. Matching is deliberately limited to the exact declared method name and normalized ordered parameter-type signature. Static, private, and final parent methods are excluded. The adapter does not apply generic substitution or infer transitive override relationships.
+
+Body dataflow is limited to simple identifier and member forms whose target is a modeled callable parameter or field. Unqualified parameters take precedence over fields; `this.field` identifies a same-owner field; `super.field` requires a resolved direct superclass; and `Type.field` requires a unique repository-local type and modeled static field. Direct assignment emits `writes`; compound assignment and increment/decrement emit both `reads` and `writes`; other supported references emit `reads`. Simple local declarations are retained only as shadowing evidence and never become invented nodes. Dynamic, external, ambiguous, or unsupported member/write evidence remains unresolved.
 
 ## Canonical identities and paths
 
@@ -80,7 +91,7 @@ The adapter excludes Git/worktree metadata (`.git`, `.worktrees`, `.workingtrees
 
 ## Current boundaries
 
-This adapter uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model implicit or transitive inheritance, overrides, calls, dataflow, module descriptors, local/anonymous classes, local variables, build dependency manifests, classpath resolution, generated sources, or incremental scope. It does not execute a compiler or infer targets from same-named declarations outside the supported package/import/lexical lookup. Annotation values, target legality, repeatable expansion, inherited annotations, and type-use placement are not semantically interpreted.
+This adapter uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model implicit or transitive inheritance, virtual dispatch, argument-type overload selection, inherited unqualified calls, instance-receiver method resolution, statically imported call targets, implicit/default constructors, initializer-body semantics, module descriptors, local/anonymous classes, lambda ownership, local-variable nodes, alias/control-flow dataflow, build dependency manifests, classpath resolution, generated sources, or incremental scope. It does not execute a compiler or infer targets from same-named declarations outside the explicitly supported lookups. Override evidence does not apply generic substitution, module accessibility, visibility beyond explicit modifiers and same-package declarations, bridge methods, covariant-return analysis, or transitive ancestry. Reads/writes do not claim array-element, chained-expression, reflective, alias, or interprocedural ownership. Annotation values, target legality, repeatable expansion, inherited annotations, and type-use placement are not semantically interpreted.
 
 Malformed literals/comments, unclosed type/member bodies, malformed package/import syntax, and member forms that cannot be classified safely remain explicit `unsupported-form` unresolved records. Valid declarations already isolated before a later malformed region may still be emitted; the unresolved record preserves the unsupported boundary. Invalid UTF-8 or NUL-containing files retain file/module evidence and emit an unresolved `defines` record.
 
@@ -90,7 +101,7 @@ Malformed literals/comments, unclosed type/member bodies, malformed package/impo
 go -C adapters/java test ./...
 ```
 
-The permanent fixtures cover packages, local and external imports, static imports, every modeled type form, ordinary and compact constructors, methods, multi-field declarations, record components, parameters, nested types, malformed syntax, permanent exclusions, declared inheritance and implementation, sealed permits, local and external annotations, exact/package/explicit/wildcard/lexical resolution, ambiguous targets, valid endpoints, canonical identities and ordering, byte determinism, checkout-path independence, stdout, and file output. A generated stream can also be checked with:
+The permanent fixtures cover packages, local and external imports, static imports, every modeled type form, ordinary and compact constructors, methods, multi-field declarations, record components, parameters, nested types, malformed syntax, permanent exclusions, declared inheritance and implementation, sealed permits, local and external annotations, exact/package/explicit/wildcard/lexical resolution, definite and possible calls, external and dynamic call evidence, constructor calls, direct overrides, field/parameter reads and writes, local shadowing, retained body ranges, ambiguous targets, valid endpoints, canonical identities and ordering, byte determinism, checkout-path independence, stdout, and file output. A generated stream can also be checked with:
 
 ```text
 python tools/validate_jsonl.py /path/to/facts.jsonl

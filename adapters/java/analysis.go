@@ -17,8 +17,10 @@ type importEvidence struct {
 }
 
 type analysisState struct {
+	callables     []callableDeclaration
 	declarations  map[string][]string
 	facts         *factSet
+	fields        map[string]map[string][]fieldDeclaration
 	imports       []importEvidence
 	namespaces    map[string]string
 	relationships []relationshipEvidence
@@ -42,7 +44,8 @@ func analyzeRepository(repository string) ([]byte, error) {
 
 	state := &analysisState{
 		declarations: make(map[string][]string), facts: facts, namespaces: make(map[string]string),
-		repositoryID: repositoryID, types: make(map[string][]typeDeclaration),
+		fields: make(map[string]map[string][]fieldDeclaration), repositoryID: repositoryID,
+		types: make(map[string][]typeDeclaration),
 	}
 	for _, source := range snapshot.sources {
 		fileID := facts.addNode("file", filepath.Base(filepath.FromSlash(source.path)), source.path, source.path, source.path, source.path, nil, nil, contentID(source.content))
@@ -56,6 +59,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 	}
 	state.resolveImports()
 	state.resolveRelationships()
+	state.resolveRuntimeSemantics()
 	return facts.render(snapshot.name)
 }
 
