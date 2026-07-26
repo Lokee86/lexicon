@@ -35,6 +35,8 @@ Those boundaries keep one language implementation reusable by every Warlock cons
 | [csharp/](csharp/README.md) | C# | C# | Roslyn syntax trees and semantic models |
 | [gdscript/](gdscript/README.md) | GDScript | Go | Dedicated parser and bounded type-flow model |
 | [generic/](generic/README.md) | Curated unsupported source extensions | Go | Conservative line-oriented fallback |
+| [java/](java/README.md) | Java | Go | Dedicated lexer, parser, and conservative semantic model |
+| [kotlin/](kotlin/README.md) | Kotlin | Go | Dedicated lexer, parser, and conservative semantic model |
 | [python/](python/README.md) | Python | Python | Standard-library `ast` |
 | [ruby/](ruby/README.md) | Ruby | Ruby | Standard-library `Ripper` |
 | [rust/](rust/README.md) | Rust | Rust | `syn` and Cargo metadata |

@@ -39,6 +39,8 @@ def main() -> int:
         ("adapter-go", [go, "test", "./..."], root / "adapters" / "go", None),
         ("adapter-gdscript", [go, "test", "./..."], root / "adapters" / "gdscript", None),
         ("adapter-generic", [go, "test", "./..."], root / "adapters" / "generic", None),
+        ("adapter-java", [go, "test", "./..."], root / "adapters" / "java", None),
+        ("adapter-kotlin", [go, "test", "./..."], root / "adapters" / "kotlin", None),
         ("adapter-python", [sys.executable, "-m", "pytest"], root / "adapters" / "python", None),
         ("adapter-ruby", [ruby, "test/test_adapter.rb"], root / "adapters" / "ruby", None),
         ("adapter-csharp", [sys.executable, "tests/test_adapter.py"], root / "adapters" / "csharp", None),

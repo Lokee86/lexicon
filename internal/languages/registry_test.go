@@ -15,6 +15,12 @@ func TestDedicatedAdaptersTakePrecedence(t *testing.T) {
 		"src/global.json":             {"csharp"},
 		"src/main.cs":                 {"csharp"},
 		"src/main.go":                 {"go"},
+		"src/main.java":               {"java"},
+		"src/main.kt":                 {"kotlin"},
+		"src/main.kts":                {"kotlin"},
+		"src/pom.xml":                 {"java"},
+		"src/build.gradle":            {"java"},
+		"src/build.gradle.kts":        {"kotlin"},
 		"src/main.py":                 {"python"},
 	} {
 		if got := ForPath(path); !reflect.DeepEqual(got, want) {
@@ -44,6 +50,12 @@ func TestGenericFallbackExcludesNonSourceFiles(t *testing.T) {
 	}
 	if !OwnsSource("csharp", "src/main.cs") || OwnsSource("generic-cs", "src/main.cs") {
 		t.Fatal("C# source ownership is not dedicated")
+	}
+	if !OwnsSource("java", "src/main.java") || IsGeneric("generic-java") {
+		t.Fatal("Java source ownership is not dedicated")
+	}
+	if !OwnsSource("kotlin", "src/main.kt") || !OwnsSource("kotlin", "src/build.gradle.kts") || IsGeneric("generic-kt") || IsGeneric("generic-kts") {
+		t.Fatal("Kotlin source ownership is not dedicated")
 	}
 	if IsGeneric("generic-md") || IsGeneric("generic") {
 		t.Fatal("unsupported generic identities must be rejected")
