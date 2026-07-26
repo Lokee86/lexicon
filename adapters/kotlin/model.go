@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	adapterVersion = "0.1.0"
+	adapterVersion = "0.2.0"
 	language       = "kotlin"
 )
 

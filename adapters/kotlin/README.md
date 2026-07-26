@@ -40,12 +40,16 @@ The foundation emits:
 - package declaration evidence from each source module to its namespace;
 - import declaration nodes, including aliases and wildcard metadata, plus `imports` edges to deterministic syntactic target nodes;
 - class, interface, object, companion object, enum class, data class, sealed class/interface, value class, and annotation-class declarations;
+- declared class/interface/object supertypes, including constructor-form entries and `by` delegation entries;
+- repository-local `extends` or `implements` edges selected from the resolved target declaration kind, with delegation expression metadata retained on delegated edges;
+- repository-local annotation applications as `annotates` edges from the annotated declaration or parameter to the annotation-class declaration;
+- explicit unresolved relationship records for external, ambiguous, or unsupported supertype and annotation targets rather than synthetic semantic targets;
 - explicit primary constructors (including the implicit empty constructor) and secondary constructors;
 - top-level functions and member methods;
 - top-level, member, extension, and primary-constructor properties, represented by the common facts-v1 `field` kind;
 - callable and constructor parameters;
 - `contains` and `defines` ownership edges for declarations and parameters;
-- annotations and sorted Kotlin modifiers when present;
+- annotation spellings and sorted Kotlin modifiers when present;
 - `suspend`, extension receiver, declared type, return type, default-parameter, mutability, and nullability metadata where syntactically available;
 - explicit `unresolved` records with relation `defines`, reason `unsupported-form`, and parser diagnostics for malformed delimiters, malformed declarations, unsupported destructuring properties, unterminated literals/comments, and other declaration syntax the structural parser cannot interpret safely.
 
@@ -73,7 +77,7 @@ Canonical identities never contain an absolute checkout path:
 - property: declaration owner, name, and extension receiver;
 - parameter: callable/constructor identity, zero-based position, and declared name.
 
-Qualified names use the declared Kotlin package and nested declaration names. Callable qualified names include declared parameter types. Repository-relative source ownership and spans remain attached to every source-derived record.
+Qualified names use the declared Kotlin package and nested declaration names. Callable qualified names include declared parameter types. Repository-relative source ownership and spans remain attached to every source-derived record. Relationship lookup recognizes exact qualified names, same-package declarations, explicit imports, aliases (including aliased nested ownership), wildcard imports, and uniquely resolved lexical nested ownership. Only declarations present in the analyzed repository are eligible semantic targets.
 
 Duplicate malformed declarations that have the same canonical source identity receive a deterministic source-order suffix. Valid Kotlin overloads remain distinct through their declared receiver and parameter types.
 
@@ -104,19 +108,19 @@ Files are discovered in canonical path order. Node identities use SHA-256, attri
 
 ```text
 cd adapters/kotlin
-go test ./...
+go test -race ./...
 ```
 
-The permanent foundation fixture covers package/import evidence, aliases, wildcard imports, classes, interfaces, objects, companion objects, enum/data/sealed/value classes, primary/secondary/implicit constructors, top-level/member/extension/suspend functions, properties, parameters, nullability, exclusions, malformed syntax, valid edge endpoints, repository-relative paths, CLI file/stdout behavior, canonical IDs, and byte determinism.
+The permanent foundation fixture covers package/import evidence, declarations, parameters, nullability, exclusions, malformed syntax, valid edge endpoints, repository-relative paths, CLI behavior, canonical IDs, and byte determinism. The focused relationship fixture covers exact, same-package, explicit-import, alias, aliased-nested, wildcard, and lexical-nested resolution; class and interface headers; delegation metadata; local annotation applications; ambiguous and external evidence; valid endpoints; and repeated full-stream byte determinism.
 
 ## Current boundaries
 
 This foundation is syntax-structural rather than compiler-semantic. It deliberately does not:
 
 - evaluate Gradle settings, builds, source sets, dependencies, compiler plugins, or Kotlin scripts;
-- invoke the Kotlin compiler or resolve symbols/types across source files or libraries;
-- infer inheritance/implementation targets, calls, reads, writes, overrides, or dependency manifests;
-- model enum entries, type parameters, local declarations, delegated-property semantics, accessors, contracts, annotations as separate nodes, or generated declarations;
+- invoke the Kotlin compiler or resolve targets from libraries, generated code, default imports, type aliases, companion scopes, expression types, or build configuration;
+- infer calls, reads, writes, overrides, dependency manifests, delegated-property semantics, or delegation behavior beyond retaining a declared supertype delegation expression;
+- model enum entries, type parameters, local declarations, accessors, contracts, annotation arguments/use-site behavior, annotations as separate application nodes, or generated declarations;
 - recover an unsafe declaration by guessing its name or shape.
 
-Imports retain source evidence but target deterministic external syntactic symbols; they are not claims of successful compiler resolution. Unsupported or malformed syntax is preserved as unresolved evidence instead of being silently converted into a declaration. These boundaries keep the adapter safe and deterministic while leaving compiler-backed resolution and additional relationship/dataflow surfaces for later slices.
+Imports retain source evidence but target deterministic external syntactic symbols; they are not claims of successful compiler resolution. The relationship pass separately uses import declarations only to identify unique repository-local type and annotation-class targets. External and ambiguous relationship targets remain unresolved, and unsupported or malformed syntax is preserved as unresolved evidence instead of being silently converted into a declaration. These boundaries keep the adapter safe and deterministic while leaving compiler-backed resolution, calls, dataflow, overrides, and dependency surfaces for later slices.

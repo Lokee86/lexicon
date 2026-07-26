@@ -34,6 +34,11 @@ func (state *analysis) emitDeclaration(file *parsedKotlinFile, declaration *decl
 	id := state.facts.addNode(kind, canonical, declaration.name, file.path, qualifiedName, file.path, &declaration.span, attributes)
 	state.facts.addEdge(ownerID, id, "contains", file.path, &declaration.span, nil)
 	state.facts.addEdge(ownerID, id, "defines", file.path, &declaration.span, nil)
+	state.indexRelationshipTarget(id, qualifiedBase, kind, declaration.form)
+	state.queueAnnotations(file, id, ownerQN, declaration.annotations, declaration.span)
+	if declaration.kind == "type" || declaration.kind == "interface" {
+		state.queueSupertypes(file, id, ownerQN, declaration.supertypes)
+	}
 
 	if kind == "function" || kind == "method" || kind == "constructor" {
 		for parameterIndex, parameter := range declaration.parameters {
@@ -43,6 +48,7 @@ func (state *analysis) emitDeclaration(file *parsedKotlinFile, declaration *decl
 			parameterID := state.facts.addNode("parameter", parameterCanonical, parameter.name, file.path, parameterQN, file.path, &parameter.span, parameterAttributes)
 			state.facts.addEdge(id, parameterID, "contains", file.path, &parameter.span, nil)
 			state.facts.addEdge(id, parameterID, "defines", file.path, &parameter.span, nil)
+			state.queueAnnotations(file, parameterID, ownerQN, parameter.annotations, parameter.span)
 		}
 	}
 

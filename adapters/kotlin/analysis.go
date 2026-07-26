@@ -7,11 +7,13 @@ import (
 )
 
 type analysis struct {
-	facts          *factSet
-	moduleByPath   map[string]string
-	namespaceByQN  map[string]string
-	repositoryID   string
-	repositoryName string
+	facts            *factSet
+	moduleByPath     map[string]string
+	namespaceByQN    map[string]string
+	pendingRelations []pendingRelationship
+	repositoryID     string
+	repositoryName   string
+	relationshipByQN map[string][]relationshipTarget
 }
 
 func analyzeRepository(repository string) ([]byte, error) {
@@ -21,7 +23,8 @@ func analyzeRepository(repository string) ([]byte, error) {
 	}
 	facts := newFactSet()
 	state := &analysis{
-		facts: facts, moduleByPath: make(map[string]string), namespaceByQN: make(map[string]string), repositoryName: repositoryName,
+		facts: facts, moduleByPath: make(map[string]string), namespaceByQN: make(map[string]string),
+		relationshipByQN: make(map[string][]relationshipTarget), repositoryName: repositoryName,
 	}
 	state.repositoryID = facts.addNode(
 		"repository", repositoryName, repositoryName, ".", repositoryName, "", nil,
@@ -78,6 +81,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 			)
 		}
 	}
+	state.emitRelationships()
 	return facts.render(repositoryName)
 }
 

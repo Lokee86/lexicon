@@ -20,6 +20,14 @@ type parameterDecl struct {
 	typeName    string
 }
 
+type supertypeDecl struct {
+	delegateExpression string
+	delegated          bool
+	expression         string
+	span               sourceSpan
+	targetName         string
+}
+
 type declaration struct {
 	annotations []string
 	children    []*declaration
@@ -33,6 +41,7 @@ type declaration struct {
 	receiver    string
 	returnType  string
 	span        sourceSpan
+	supertypes  []supertypeDecl
 	typeName    string
 }
 

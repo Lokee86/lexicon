@@ -84,24 +84,11 @@ func (state *parser) parseType(prefix declarationPrefix) *declaration {
 		span:        state.span(prefix.start, maxInt(prefix.start, state.index-1)),
 	}
 
-	// Consume the supertype/header clause until the body or the declaration boundary.
-	for state.current().kind != tokenEOF && !state.at("{") && !state.at(";") {
-		if state.current().kind == tokenNewline {
-			lookahead := state.nextNonNewline(state.index + 1)
-			if lookahead >= len(state.tokens) || state.tokens[lookahead].text != "{" {
-				break
-			}
-		}
-		if state.at("(") {
-			state.skipBalanced("(", ")")
-			continue
-		}
-		if state.at("<") {
-			state.skipBalanced("<", ">")
-			continue
-		}
-		state.index++
+	headerEnd := state.findTypeHeaderEnd()
+	if state.at(":") {
+		typeDeclaration.supertypes = state.parseSupertypes(state.index+1, headerEnd)
 	}
+	state.index = headerEnd
 
 	if state.at("{") {
 		state.index++
