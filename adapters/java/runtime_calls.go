@@ -1,9 +1,5 @@
 package main
 
-import (
-	"sort"
-)
-
 type invocationEvidence struct {
 	arity      int
 	end        int
@@ -163,12 +159,5 @@ func withoutCallable(candidates []callableDeclaration, id string) []callableDecl
 }
 
 func (state *analysisState) directSuperclasses(ownerID string) []string {
-	var result []string
-	for _, edge := range state.facts.edges {
-		if edge["source"] == ownerID && edge["relation"] == "extends" {
-			result = appendUnique(result, edge["target"].(string))
-		}
-	}
-	sort.Strings(result)
-	return result
+	return state.superclassIDs[ownerID]
 }

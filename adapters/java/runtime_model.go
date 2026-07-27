@@ -57,6 +57,7 @@ func (state *analysisState) resolveRuntimeSemantics() {
 	sort.Slice(state.callables, func(left, right int) bool {
 		return state.callables[left].id < state.callables[right].id
 	})
+	state.indexDirectParents()
 	state.emitOverrides()
 	for index := range state.callables {
 		callable := &state.callables[index]
@@ -65,6 +66,29 @@ func (state *analysisState) resolveRuntimeSemantics() {
 		}
 		state.emitCalls(callable)
 		state.emitDataflow(callable)
+	}
+}
+
+func (state *analysisState) indexDirectParents() {
+	state.parentIDs = make(map[string][]string)
+	state.superclassIDs = make(map[string][]string)
+	for _, edge := range state.facts.edges {
+		relation, _ := edge["relation"].(string)
+		if relation != "extends" && relation != "implements" {
+			continue
+		}
+		source, _ := edge["source"].(string)
+		target, _ := edge["target"].(string)
+		state.parentIDs[source] = appendUnique(state.parentIDs[source], target)
+		if relation == "extends" {
+			state.superclassIDs[source] = appendUnique(state.superclassIDs[source], target)
+		}
+	}
+	for source := range state.parentIDs {
+		sort.Strings(state.parentIDs[source])
+	}
+	for source := range state.superclassIDs {
+		sort.Strings(state.superclassIDs[source])
 	}
 }
 
@@ -145,19 +169,7 @@ func (state *analysisState) resolveTypeDeclarations(name, lexicalOwner string, c
 }
 
 func (state *analysisState) directParents(ownerID string) []string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, edge := range state.facts.edges {
-		relation, _ := edge["relation"].(string)
-		source, _ := edge["source"].(string)
-		target, _ := edge["target"].(string)
-		if source == ownerID && (relation == "extends" || relation == "implements") && !seen[target] {
-			seen[target] = true
-			result = append(result, target)
-		}
-	}
-	sort.Strings(result)
-	return result
+	return state.parentIDs[ownerID]
 }
 
 func hasModifier(modifiers []string, wanted string) bool {

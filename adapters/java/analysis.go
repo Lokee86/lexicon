@@ -19,6 +19,8 @@ type importEvidence struct {
 type analysisState struct {
 	callables     []callableDeclaration
 	declarations  map[string][]string
+	parentIDs     map[string][]string
+	superclassIDs map[string][]string
 	facts         *factSet
 	fields        map[string]map[string][]fieldDeclaration
 	imports       []importEvidence

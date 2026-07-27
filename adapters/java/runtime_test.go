@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -130,6 +131,22 @@ func TestCallableBodyTokenRangesAreRetained(t *testing.T) {
 		if callable.bodyStart < 1 || callable.bodyEnd < callable.bodyStart || callable.tokens[callable.bodyStart-1].text != "{" || callable.tokens[callable.bodyEnd].text != "}" {
 			t.Fatalf("invalid body range for %s: [%d,%d)", callable.name, callable.bodyStart, callable.bodyEnd)
 		}
+	}
+}
+
+func TestDirectParentIndexPreservesSortedRelationshipSets(t *testing.T) {
+	state := &analysisState{facts: newFactSet()}
+	state.facts.addEdge("child", "interface", "implements", "", nil, nil)
+	state.facts.addEdge("child", "base", "extends", "", nil, nil)
+	state.facts.addEdge("child", "base", "extends", "", nil, nil)
+	state.facts.addEdge("other", "unrelated", "calls", "", nil, nil)
+
+	state.indexDirectParents()
+	if got, want := state.directParents("child"), []string{"base", "interface"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("direct parents = %v, want %v", got, want)
+	}
+	if got, want := state.directSuperclasses("child"), []string{"base"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("direct superclasses = %v, want %v", got, want)
 	}
 }
 
