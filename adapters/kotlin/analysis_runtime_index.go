@@ -6,13 +6,19 @@ import (
 )
 
 type runtimeIndex struct {
-	callables       []*runtimeCallable
-	callablesByKey  map[string][]*runtimeCallable
-	constructors    map[string][]*runtimeCallable
-	extensionsByQN  map[string][]*runtimeCallable
-	propertiesByKey map[string][]runtimeProperty
-	typesByID       map[string]*runtimeType
-	typesByQN       map[string][]*runtimeType
+	callables            []*runtimeCallable
+	callablesByKey       map[string][]*runtimeCallable
+	constructors         map[string][]*runtimeCallable
+	extensionsByQN       map[string][]*runtimeCallable
+	ordinaryMembersByKey map[string]*runtimeAcceptedArities
+	propertiesByKey      map[string][]runtimeProperty
+	typesByID            map[string]*runtimeType
+	typesByQN            map[string][]*runtimeType
+}
+
+type runtimeAcceptedArities struct {
+	exact        map[int]struct{}
+	variadicFrom int
 }
 
 type runtimeCallable struct {
@@ -45,12 +51,13 @@ type runtimeType struct {
 
 func newRuntimeIndex() *runtimeIndex {
 	return &runtimeIndex{
-		callablesByKey:  make(map[string][]*runtimeCallable),
-		constructors:    make(map[string][]*runtimeCallable),
-		extensionsByQN:  make(map[string][]*runtimeCallable),
-		propertiesByKey: make(map[string][]runtimeProperty),
-		typesByID:       make(map[string]*runtimeType),
-		typesByQN:       make(map[string][]*runtimeType),
+		callablesByKey:       make(map[string][]*runtimeCallable),
+		constructors:         make(map[string][]*runtimeCallable),
+		extensionsByQN:       make(map[string][]*runtimeCallable),
+		ordinaryMembersByKey: make(map[string]*runtimeAcceptedArities),
+		propertiesByKey:      make(map[string][]runtimeProperty),
+		typesByID:            make(map[string]*runtimeType),
+		typesByQN:            make(map[string][]*runtimeType),
 	}
 }
 
@@ -78,6 +85,9 @@ func (state *analysis) indexRuntimeDeclaration(
 			signature: normalizedParameterSignature(declaration.parameters),
 		}
 		state.runtime.callables = append(state.runtime.callables, callable)
+		if declaration.receiver == "" {
+			state.runtime.indexOrdinaryMember(ownerQN, declaration)
+		}
 		if kind == "constructor" {
 			state.runtime.constructors[runtimeArityKey(ownerQN, len(declaration.parameters))] = append(
 				state.runtime.constructors[runtimeArityKey(ownerQN, len(declaration.parameters))], callable,
@@ -94,6 +104,36 @@ func (state *analysis) indexRuntimeDeclaration(
 		return callable
 	}
 	return nil
+}
+
+func (index *runtimeIndex) indexOrdinaryMember(owner string, declaration *declaration) {
+	key := runtimeMemberKey(owner, declaration.name)
+	arities := index.ordinaryMembersByKey[key]
+	if arities == nil {
+		arities = &runtimeAcceptedArities{exact: make(map[int]struct{}), variadicFrom: -1}
+		index.ordinaryMembersByKey[key] = arities
+	}
+	for arity := 0; arity <= len(declaration.parameters); arity++ {
+		if runtimeCallableAcceptsArity(declaration, arity) {
+			arities.exact[arity] = struct{}{}
+		}
+	}
+	variadicFrom := len(declaration.parameters) + 1
+	if runtimeCallableAcceptsArity(declaration, variadicFrom) &&
+		(arities.variadicFrom < 0 || variadicFrom < arities.variadicFrom) {
+		arities.variadicFrom = variadicFrom
+	}
+}
+
+func (index *runtimeIndex) hasOrdinaryMember(owner, name string, arity int) bool {
+	arities := index.ordinaryMembersByKey[runtimeMemberKey(owner, name)]
+	if arities == nil {
+		return false
+	}
+	if _, exists := arities.exact[arity]; exists {
+		return true
+	}
+	return arities.variadicFrom >= 0 && arity >= arities.variadicFrom
 }
 
 func runtimeCallableKey(owner, name string, arity int) string {

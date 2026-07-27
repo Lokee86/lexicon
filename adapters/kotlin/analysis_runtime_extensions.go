@@ -59,11 +59,8 @@ func (state *analysis) runtimeTypeHasOrdinaryMember(receiver *runtimeType, name 
 			continue
 		}
 		seen[current.id] = struct{}{}
-		for _, candidate := range state.runtime.callables {
-			if candidate.ownerQN == current.qualified && candidate.declaration.receiver == "" &&
-				candidate.declaration.name == name && runtimeCallableAcceptsArity(candidate.declaration, arity) {
-				return true
-			}
+		if state.runtime.hasOrdinaryMember(current.qualified, name, arity) {
+			return true
 		}
 		queue = append(queue, state.directRuntimeSupertypes(current.qualified)...)
 	}
