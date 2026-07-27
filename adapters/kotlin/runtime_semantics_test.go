@@ -104,6 +104,76 @@ func TestRuntimeFixtureEmitsOverridesAndProvenDataflow(t *testing.T) {
 	}
 }
 
+func TestDirectCompanionIndexResolvesOnlyDirectCallableAndPropertyMembers(t *testing.T) {
+	state := &analysis{runtime: newRuntimeIndex()}
+	file := &parsedKotlinFile{packageName: "companions", path: "Companions.kt"}
+	indexType := func(id, owner, qualified, form string) *runtimeType {
+		declaration := &declaration{form: form, kind: "type", name: simpleQualifiedName(qualified)}
+		state.indexRuntimeDeclaration(file, declaration, id, "type", owner, "type", qualified)
+		return state.runtime.typesByID[id]
+	}
+	indexCallable := func(id, owner, name, receiver string) {
+		declaration := &declaration{
+			kind: "function", name: name, receiver: receiver,
+			parameters: []parameterDecl{{name: "value"}},
+		}
+		state.indexRuntimeDeclaration(file, declaration, id, "method", owner, "type", owner+"."+name)
+	}
+	indexProperty := func(id, owner, name, receiver string, delegated bool) {
+		declaration := &declaration{
+			delegated: delegated, kind: "field", name: name, receiver: receiver,
+		}
+		state.indexRuntimeDeclaration(file, declaration, id, "field", owner, "type", owner+"."+name)
+	}
+
+	const factoryQN = "companions.Factory"
+	const directQN = factoryQN + ".Companion"
+	factory := indexType("factory", "companions", factoryQN, "class")
+	indexType("direct", factoryQN, directQN, "companion_object")
+	indexType("direct", factoryQN, directQN, "companion_object")
+	indexType("named", factoryQN, factoryQN+".Named", "companion_object")
+	indexType("nested", factoryQN, factoryQN+".Nested", "object")
+	indexType("deep", factoryQN+".Nested", factoryQN+".Nested.Companion", "companion_object")
+
+	indexCallable("create", directQN, "create", "")
+	indexCallable("extension-create", directQN, "create", "String")
+	indexCallable("ambiguous-direct", directQN, "ambiguous", "")
+	indexCallable("ambiguous-named", factoryQN+".Named", "ambiguous", "")
+	indexCallable("nested-call", factoryQN+".Nested", "notDirect", "")
+	indexCallable("deep-call", factoryQN+".Nested.Companion", "notDirect", "")
+
+	targets := state.qualifiedCallables(factory, "create", 1)
+	if len(targets) != 1 || targets[0].id != "create" {
+		t.Fatalf("direct companion callables = %#v, want create", targets)
+	}
+	if targets := state.qualifiedCallables(factory, "ambiguous", 1); len(targets) != 2 {
+		t.Fatalf("ambiguous direct companion callables = %d, want 2", len(targets))
+	}
+	if targets := state.qualifiedCallables(factory, "notDirect", 1); len(targets) != 0 {
+		t.Fatalf("non-direct companion callables = %d, want 0", len(targets))
+	}
+
+	indexProperty("value", directQN, "value", "", false)
+	indexProperty("extension-value", directQN, "value", "String", false)
+	indexProperty("delegated-value", directQN, "value", "", true)
+	indexProperty("ambiguous-direct-value", directQN, "ambiguous", "", false)
+	indexProperty("ambiguous-named-value", factoryQN+".Named", "ambiguous", "", false)
+	indexProperty("nested-value", factoryQN+".Nested", "notDirect", "", false)
+	indexProperty("deep-value", factoryQN+".Nested.Companion", "notDirect", "", false)
+
+	caller := &runtimeCallable{file: file, ownerKind: "type", ownerQN: "companions.Usage"}
+	shadowed := make(map[string]struct{})
+	if target := state.resolveRuntimeValue(caller, "Factory", "value", shadowed); target != "value" {
+		t.Fatalf("direct companion property = %q, want value", target)
+	}
+	if target := state.resolveRuntimeValue(caller, "Factory", "ambiguous", shadowed); target != "" {
+		t.Fatalf("ambiguous direct companion property = %q, want empty", target)
+	}
+	if target := state.resolveRuntimeValue(caller, "Factory", "notDirect", shadowed); target != "" {
+		t.Fatalf("non-direct companion property = %q, want empty", target)
+	}
+}
+
 func TestParserRetainsCallableBodyAndDelegationRanges(t *testing.T) {
 	path := filepath.FromSlash(runtimeFixturePath + "/src/main/kotlin/runtime/slice/Runtime.kt")
 	content, err := os.ReadFile(path)

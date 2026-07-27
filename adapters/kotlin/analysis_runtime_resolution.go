@@ -127,16 +127,8 @@ func (state *analysis) qualifiedCallables(owner *runtimeType, name string, arity
 		return ordinaryCallables(state.runtime.callablesByKey[runtimeCallableKey(owner.qualified, name, arity)])
 	}
 	var targets []*runtimeCallable
-	prefix := owner.qualified + "."
-	for qualifiedName, types := range state.runtime.typesByQN {
-		if !strings.HasPrefix(qualifiedName, prefix) || strings.Contains(strings.TrimPrefix(qualifiedName, prefix), ".") {
-			continue
-		}
-		for _, companion := range types {
-			if companion.form == "companion_object" {
-				targets = append(targets, state.runtime.callablesByKey[runtimeCallableKey(companion.qualified, name, arity)]...)
-			}
-		}
+	for _, companion := range state.runtime.directCompanionsByOwner[owner.qualified] {
+		targets = append(targets, state.runtime.callablesByKey[runtimeCallableKey(companion.qualified, name, arity)]...)
 	}
 	return ordinaryCallables(targets)
 }

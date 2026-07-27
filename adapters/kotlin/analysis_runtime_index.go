@@ -6,14 +6,15 @@ import (
 )
 
 type runtimeIndex struct {
-	callables            []*runtimeCallable
-	callablesByKey       map[string][]*runtimeCallable
-	constructors         map[string][]*runtimeCallable
-	extensionsByQN       map[string][]*runtimeCallable
-	ordinaryMembersByKey map[string]*runtimeAcceptedArities
-	propertiesByKey      map[string][]runtimeProperty
-	typesByID            map[string]*runtimeType
-	typesByQN            map[string][]*runtimeType
+	callables               []*runtimeCallable
+	callablesByKey          map[string][]*runtimeCallable
+	constructors            map[string][]*runtimeCallable
+	directCompanionsByOwner map[string][]*runtimeType
+	extensionsByQN          map[string][]*runtimeCallable
+	ordinaryMembersByKey    map[string]*runtimeAcceptedArities
+	propertiesByKey         map[string][]runtimeProperty
+	typesByID               map[string]*runtimeType
+	typesByQN               map[string][]*runtimeType
 }
 
 type runtimeAcceptedArities struct {
@@ -51,13 +52,14 @@ type runtimeType struct {
 
 func newRuntimeIndex() *runtimeIndex {
 	return &runtimeIndex{
-		callablesByKey:       make(map[string][]*runtimeCallable),
-		constructors:         make(map[string][]*runtimeCallable),
-		extensionsByQN:       make(map[string][]*runtimeCallable),
-		ordinaryMembersByKey: make(map[string]*runtimeAcceptedArities),
-		propertiesByKey:      make(map[string][]runtimeProperty),
-		typesByID:            make(map[string]*runtimeType),
-		typesByQN:            make(map[string][]*runtimeType),
+		callablesByKey:          make(map[string][]*runtimeCallable),
+		constructors:            make(map[string][]*runtimeCallable),
+		directCompanionsByOwner: make(map[string][]*runtimeType),
+		extensionsByQN:          make(map[string][]*runtimeCallable),
+		ordinaryMembersByKey:    make(map[string]*runtimeAcceptedArities),
+		propertiesByKey:         make(map[string][]runtimeProperty),
+		typesByID:               make(map[string]*runtimeType),
+		typesByQN:               make(map[string][]*runtimeType),
 	}
 }
 
@@ -74,6 +76,11 @@ func (state *analysis) indexRuntimeDeclaration(
 		}
 		state.runtime.typesByID[id] = target
 		state.runtime.typesByQN[qualifiedBase] = append(state.runtime.typesByQN[qualifiedBase], target)
+		if target.form == "companion_object" {
+			state.runtime.directCompanionsByOwner[ownerQN] = append(
+				state.runtime.directCompanionsByOwner[ownerQN], target,
+			)
+		}
 	case "field":
 		property := runtimeProperty{declaration: declaration, file: file, id: id, ownerQN: ownerQN}
 		key := runtimeMemberKey(ownerQN, declaration.name)

@@ -99,17 +99,9 @@ func (state *analysis) resolveRuntimeValue(
 		return state.uniqueRuntimeProperty(owner.qualified, name)
 	}
 	var targets []string
-	prefix := owner.qualified + "."
-	for qualifiedName, types := range state.runtime.typesByQN {
-		if !strings.HasPrefix(qualifiedName, prefix) || strings.Contains(strings.TrimPrefix(qualifiedName, prefix), ".") {
-			continue
-		}
-		for _, companion := range types {
-			if companion.form == "companion_object" {
-				if target := state.uniqueRuntimeProperty(companion.qualified, name); target != "" {
-					targets = append(targets, target)
-				}
-			}
+	for _, companion := range state.runtime.directCompanionsByOwner[owner.qualified] {
+		if target := state.uniqueRuntimeProperty(companion.qualified, name); target != "" {
+			targets = append(targets, target)
 		}
 	}
 	if len(uniqueStrings(targets)) == 1 {
