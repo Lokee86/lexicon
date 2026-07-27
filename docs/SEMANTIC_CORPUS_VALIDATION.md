@@ -47,6 +47,8 @@ Before the dataflow fix, repeated Space Rocks client scans differed by 77 edges.
 
 A later performance profile found that the deterministic nearest-prior and unique-member rules were implemented with repository-wide declaration scans for every identifier and member reference. Function/name and owner/name indexes now narrow those lookups without changing the selection rules. On a frozen 526-file Space Rocks client snapshot, alternating baseline and optimized scans averaged 61.87 seconds and 7.43 seconds respectively, while all outputs remained byte-identical.
 
+The semantic follow-up likewise preserves all inference rules. It precomputes static statement contexts, assignment/declaration metadata, and parsed call sites, while each fixed-point iteration still recomputes evolving owner, callable, argument, and dispatch evidence. A direct child index replaces repeated full inheritance-map scans during runtime receiver expansion. On detached Space Rocks revision `8ecee944`, a six-scan alternating comparison improved from 6.46 seconds to 3.46 seconds, with every 42,456,066-byte output sharing SHA-256 `069753a087abf65651fb17905b890ec4f1e4ee10b3a3b9768cf44106b8064dac`.
+
 ## Interpretation
 
 This run establishes that the added call, possible-call, read, write, dependency, inheritance, override, and related semantic streams are implemented, survive representative repositories, and are deterministic for the current corpus.

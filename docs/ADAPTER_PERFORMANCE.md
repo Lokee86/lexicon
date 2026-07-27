@@ -1,6 +1,6 @@
 # Cross-adapter performance work
 
-Performance pass date: July 26, 2026.
+Performance pass dates: July 26-27, 2026.
 
 This report records measured adapter optimizations and rejected experiments. Performance changes are accepted only when the facts-v1 stream remains deterministic and semantically unchanged. Dated timings are local measurements, not permanent guarantees.
 
@@ -37,7 +37,23 @@ The live Space Rocks checkout was being edited concurrently, so the controlled c
 
 All four alternating runs and the profiled optimized run emitted the same 44,219,265-byte facts-v1 stream with SHA-256 `ee51c7622f0a773701a11ce7cd26c518d2586d601af8c86a1f487a49d346c598`. The timer-free production build emitted the same stream again.
 
-After the dataflow fix, semantic-model convergence is the largest measured phase: 5.11 seconds across nine fixed-point iterations, including 2.85 seconds of argument propagation. That is the next evidence-backed GDScript performance target; it was not changed in this slice.
+After the dataflow fix, semantic-model convergence became the largest measured phase: 5.11 seconds across nine fixed-point iterations, including 2.85 seconds of argument propagation. The follow-up pass retained evolving type, callable, and dispatch inference inside every iteration, but precomputed the static work around it:
+
+- statement contexts, assignment positions, and declaration classification;
+- parsed call sites and their enclosing contexts;
+- direct child relationships for runtime subtype expansion.
+
+Previously, argument propagation reparsed every statement's calls and rescanned file declarations to rebuild context on every iteration. Runtime receiver expansion also scanned the complete inheritance map for each receiver. The new semantic-site and child indexes change only the candidate-discovery path.
+
+A controlled six-scan comparison used detached Space Rocks revision `8ecee944` in baseline/optimized/optimized/baseline/optimized/baseline order:
+
+| Metric | Baseline | Optimized | Change |
+| --- | ---: | ---: | ---: |
+| Average runtime | 6.46 s | 3.46 s | 46.52% lower; 1.87x faster |
+
+Every scan emitted the same 42,456,066-byte facts-v1 stream with SHA-256 `069753a087abf65651fb17905b890ec4f1e4ee10b3a3b9768cf44106b8064dac`. Focused tests also cover precomputed semantic metadata, transitive child expansion, and the lazy child-index fallback used by direct fixtures.
+
+The final CPU profile measured semantic-model construction at about 1.60 seconds. Argument propagation was about 760 ms, declaration inference 420 ms, and statement inference 220 ms; no remaining semantic routine dominated the complete adapter run. Further GDScript optimization is therefore deferred until new profiling evidence justifies it.
 
 ## Generic fallback
 
@@ -106,7 +122,7 @@ Accepted changes passed:
 - full TypeScript corpus validation with no failures;
 - repeated deterministic facts-v1 validation;
 - byte-identical generic-C corpus comparison;
-- GDScript race-enabled adapter tests and byte-identical frozen Space Rocks baseline/optimized comparisons;
+- GDScript race-enabled adapter tests, focused semantic-site/index regressions, and byte-identical frozen Space Rocks baseline/optimized comparisons;
 - C# smoke, MSBuild graph, relation, incremental, and determinism checks;
 - byte-identical baseline/optimized comparisons across Spectre.Console, Dapper, and Polly.
 

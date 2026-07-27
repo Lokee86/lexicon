@@ -39,6 +39,7 @@ type factSet struct {
 	dataflowMemberByOwnerName   map[string]map[string][]string
 	dataflowLocalByFunctionName map[string]map[string][]string
 	parentByOwnerID             map[string][]string
+	childByOwnerID              map[string][]string
 	externalParentByOwnerID     map[string]bool
 	scriptOwnerByPath           map[string]string
 	scriptOwnerCandidatesByPath map[string][]string
@@ -186,18 +187,6 @@ func (f *factSet) indexDeclaration(pf *parsedFile, decl *declaration) {
 		}
 		f.staticMethodByOwnerID[owner][decl.name] = append(f.staticMethodByOwnerID[owner][decl.name], decl.nodeID)
 	}
-}
-
-func (f *factSet) indexParent(source, target string) {
-	if f.parentByOwnerID == nil {
-		f.parentByOwnerID = make(map[string][]string)
-	}
-	for _, existing := range f.parentByOwnerID[source] {
-		if existing == target {
-			return
-		}
-	}
-	f.parentByOwnerID[source] = append(f.parentByOwnerID[source], target)
 }
 
 func (f *factSet) indexClassDeclaration(path, name, id string) {

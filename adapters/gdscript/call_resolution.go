@@ -169,19 +169,17 @@ func (m *semanticModel) methodTargetsSeen(owner, name string, staticOnly, parent
 }
 
 func (m *semanticModel) runtimeReceiverOwners(owners []string) []string {
+	m.facts.ensureChildIndex()
 	result := append([]string(nil), owners...)
 	seen := make(map[string]bool)
 	for _, owner := range owners {
 		seen[owner] = true
 	}
 	for index := 0; index < len(result); index++ {
-		owner := result[index]
-		for candidate, parents := range m.facts.parentByOwnerID {
-			for _, parent := range parents {
-				if parent == owner && !seen[candidate] {
-					seen[candidate] = true
-					result = append(result, candidate)
-				}
+		for _, child := range m.facts.childByOwnerID[result[index]] {
+			if !seen[child] {
+				seen[child] = true
+				result = append(result, child)
 			}
 		}
 	}

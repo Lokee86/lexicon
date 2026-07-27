@@ -3,18 +3,20 @@ package main
 type ownerSet map[string]struct{}
 
 type semanticModel struct {
-	facts              *factSet
-	files              []*parsedFile
-	members            map[string]map[string]ownerSet
-	locals             map[string]map[string]ownerSet
-	returns            map[string]ownerSet
-	typeAliases        map[string]map[string]ownerSet
-	memberCallables    map[string]map[string]ownerSet
-	localCallables     map[string]map[string]ownerSet
-	returnCallables    map[string]ownerSet
-	memberCallableMaps map[string]map[string]keyedCallables
-	localCallableMaps  map[string]map[string]keyedCallables
-	returnCallableMaps map[string]keyedCallables
+	facts               *factSet
+	files               []*parsedFile
+	members             map[string]map[string]ownerSet
+	locals              map[string]map[string]ownerSet
+	returns             map[string]ownerSet
+	typeAliases         map[string]map[string]ownerSet
+	memberCallables     map[string]map[string]ownerSet
+	localCallables      map[string]map[string]ownerSet
+	returnCallables     map[string]ownerSet
+	memberCallableMaps  map[string]map[string]keyedCallables
+	localCallableMaps   map[string]map[string]keyedCallables
+	returnCallableMaps  map[string]keyedCallables
+	argumentCallSites   map[*parsedFile][]argumentCallSite
+	inferenceStatements map[*parsedFile][]inferenceStatementSite
 }
 
 type analysisContext struct {
@@ -26,16 +28,18 @@ type analysisContext struct {
 func buildSemanticModel(facts *factSet, files []*parsedFile) *semanticModel {
 	model := &semanticModel{
 		facts: facts, files: files,
-		members:            make(map[string]map[string]ownerSet),
-		locals:             make(map[string]map[string]ownerSet),
-		returns:            make(map[string]ownerSet),
-		typeAliases:        make(map[string]map[string]ownerSet),
-		memberCallables:    make(map[string]map[string]ownerSet),
-		localCallables:     make(map[string]map[string]ownerSet),
-		returnCallables:    make(map[string]ownerSet),
-		memberCallableMaps: make(map[string]map[string]keyedCallables),
-		localCallableMaps:  make(map[string]map[string]keyedCallables),
-		returnCallableMaps: make(map[string]keyedCallables),
+		members:             make(map[string]map[string]ownerSet),
+		locals:              make(map[string]map[string]ownerSet),
+		returns:             make(map[string]ownerSet),
+		typeAliases:         make(map[string]map[string]ownerSet),
+		memberCallables:     make(map[string]map[string]ownerSet),
+		localCallables:      make(map[string]map[string]ownerSet),
+		returnCallables:     make(map[string]ownerSet),
+		memberCallableMaps:  make(map[string]map[string]keyedCallables),
+		localCallableMaps:   make(map[string]map[string]keyedCallables),
+		returnCallableMaps:  make(map[string]keyedCallables),
+		argumentCallSites:   buildArgumentCallSites(files),
+		inferenceStatements: buildInferenceStatementSites(files),
 	}
 	model.seedDeclaredTypes()
 	for iteration := 0; iteration < 16; iteration++ {
@@ -116,24 +120,21 @@ func (m *semanticModel) inferDeclarations(file *parsedFile) bool {
 
 func (m *semanticModel) inferStatements(file *parsedFile) bool {
 	changed := false
-	for _, stmt := range file.statements {
-		context := contextForStatement(file, stmt)
-		if len(stmt.tokens) == 0 {
+	for _, site := range m.inferenceStatements[file] {
+		context := site.context
+		tokens := site.tokens
+		if tokens[0].text == "return" && context.functionID != "" {
+			changed = m.addReturn(context.functionID, m.inferExpressionOwners(context, tokens[1:])) || changed
+			changed = m.addReturnCallable(context.functionID, m.inferExpressionCallables(context, tokens[1:])) || changed
+			changed = m.addReturnCallableMap(context.functionID, m.inferExpressionCallableMap(context, tokens[1:])) || changed
+		}
+		if site.assignment < 0 || site.declaration {
 			continue
 		}
-		if stmt.tokens[0].text == "return" && context.functionID != "" {
-			changed = m.addReturn(context.functionID, m.inferExpressionOwners(context, stmt.tokens[1:])) || changed
-			changed = m.addReturnCallable(context.functionID, m.inferExpressionCallables(context, stmt.tokens[1:])) || changed
-			changed = m.addReturnCallableMap(context.functionID, m.inferExpressionCallableMap(context, stmt.tokens[1:])) || changed
-		}
-		assignment := topLevelAssignment(stmt.tokens)
-		if assignment < 0 || parseDeclaration(stmt) != nil {
-			continue
-		}
-		left := stmt.tokens[:assignment]
-		owners := m.inferExpressionOwners(context, stmt.tokens[assignment+1:])
-		callables := m.inferExpressionCallables(context, stmt.tokens[assignment+1:])
-		callableMap := m.inferExpressionCallableMap(context, stmt.tokens[assignment+1:])
+		left := tokens[:site.assignment]
+		owners := m.inferExpressionOwners(context, tokens[site.assignment+1:])
+		callables := m.inferExpressionCallables(context, tokens[site.assignment+1:])
+		callableMap := m.inferExpressionCallableMap(context, tokens[site.assignment+1:])
 		if memberName, targetOwners := m.assignmentMemberTargets(context, left); memberName != "" && len(targetOwners) > 0 {
 			for targetOwner := range targetOwners {
 				changed = m.addMember(targetOwner, memberName, owners) || changed
@@ -161,17 +162,14 @@ func (m *semanticModel) inferStatements(file *parsedFile) bool {
 
 func (m *semanticModel) propagateArguments(file *parsedFile) bool {
 	changed := false
-	for _, stmt := range file.statements {
-		context := contextForStatement(file, stmt)
-		for _, call := range findCalls(stmt, file.path) {
-			resolution := m.resolveCall(context, call)
-			for _, target := range resolution.functionTargets {
-				changed = m.addArgumentsToFunction(context, target, call.args) || changed
-			}
-			for _, owner := range resolution.constructorOwners {
-				for _, target := range m.methodTargets(owner, "_init", false, false) {
-					changed = m.addArgumentsToFunction(context, target, call.args) || changed
-				}
+	for _, site := range m.argumentCallSites[file] {
+		resolution := m.resolveCall(site.context, site.call)
+		for _, target := range resolution.functionTargets {
+			changed = m.addArgumentsToFunction(site.context, target, site.call.args) || changed
+		}
+		for _, owner := range resolution.constructorOwners {
+			for _, target := range m.methodTargets(owner, "_init", false, false) {
+				changed = m.addArgumentsToFunction(site.context, target, site.call.args) || changed
 			}
 		}
 	}
