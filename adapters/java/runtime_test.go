@@ -189,6 +189,34 @@ func TestDirectParentIndexPreservesSortedRelationshipSets(t *testing.T) {
 	}
 }
 
+func TestOverrideIndexesScopeCandidatesAndTypeKinds(t *testing.T) {
+	state := &analysisState{
+		callables: []callableDeclaration{
+			{id: "matching", ownerID: "parent", name: "run", signature: "String"},
+			{id: "wrong-name", ownerID: "parent", name: "stop", signature: "String"},
+			{id: "wrong-owner", ownerID: "sibling", name: "run", signature: "String"},
+			{id: "wrong-signature", ownerID: "parent", name: "run", signature: "int"},
+		},
+		declarations: make(map[string][]string),
+		types:        make(map[string][]typeDeclaration),
+	}
+	state.indexCallablesByOwnerNameSignature()
+	candidates := state.overrideCandidates("parent", "run", "String")
+	if len(candidates) != 1 || candidates[0].id != "matching" {
+		t.Fatalf("override candidates = %#v, want only matching", candidates)
+	}
+
+	state.registerType("demo.Contract", "contract", "interface")
+	state.registerType("demo.Marker", "marker", "annotation")
+	state.registerType("demo.Base", "base", "class")
+	if !state.interfaceType("contract") || !state.interfaceType("marker") {
+		t.Fatal("interface type index did not retain interface-like declarations")
+	}
+	if state.interfaceType("base") || state.interfaceType("missing") {
+		t.Fatal("interface type index classified a class or missing declaration as interface-like")
+	}
+}
+
 func TestRuntimeSemanticsAreCanonicalDeterministicAndCheckoutIndependent(t *testing.T) {
 	first := analyzeFixture(t, runtimeFixture)
 	if second := analyzeFixture(t, runtimeFixture); !bytes.Equal(first, second) {

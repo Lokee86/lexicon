@@ -6,7 +6,7 @@ func (state *analysisState) emitOverrides() {
 			continue
 		}
 		for _, parentID := range state.directParents(method.ownerID) {
-			for _, target := range state.callables {
+			for _, target := range state.overrideCandidates(parentID, method.name, method.signature) {
 				if !state.overrideSignaturesMatch(method, target, parentID) {
 					continue
 				}
@@ -33,12 +33,6 @@ func (state *analysisState) overrideSignaturesMatch(method, target callableDecla
 }
 
 func (state *analysisState) interfaceType(id string) bool {
-	for _, declarations := range state.types {
-		for _, declaration := range declarations {
-			if declaration.id == id {
-				return declaration.declarationKind == "interface" || declaration.declarationKind == "annotation"
-			}
-		}
-	}
-	return false
+	declarationKind := state.typeKindsByID[id]
+	return declarationKind == "interface" || declarationKind == "annotation"
 }

@@ -25,6 +25,12 @@ type callableDeclaration struct {
 	tokens                 []token
 }
 
+type callableIndexKey struct {
+	name      string
+	ownerID   string
+	signature string
+}
+
 type fieldDeclaration struct {
 	id        string
 	modifiers []string
@@ -58,6 +64,7 @@ func (state *analysisState) resolveRuntimeSemantics() {
 		return state.callables[left].id < state.callables[right].id
 	})
 	state.indexDirectParents()
+	state.indexCallablesByOwnerNameSignature()
 	state.emitOverrides()
 	for index := range state.callables {
 		callable := &state.callables[index]
@@ -67,6 +74,18 @@ func (state *analysisState) resolveRuntimeSemantics() {
 		state.emitCalls(callable)
 		state.emitDataflow(callable)
 	}
+}
+
+func (state *analysisState) indexCallablesByOwnerNameSignature() {
+	state.callablesByOwnerNameSignature = make(map[callableIndexKey][]callableDeclaration)
+	for _, declaration := range state.callables {
+		key := callableIndexKey{ownerID: declaration.ownerID, name: declaration.name, signature: declaration.signature}
+		state.callablesByOwnerNameSignature[key] = append(state.callablesByOwnerNameSignature[key], declaration)
+	}
+}
+
+func (state *analysisState) overrideCandidates(ownerID, name, signature string) []callableDeclaration {
+	return state.callablesByOwnerNameSignature[callableIndexKey{ownerID: ownerID, name: name, signature: signature}]
 }
 
 func (state *analysisState) indexDirectParents() {

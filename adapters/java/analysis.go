@@ -17,17 +17,19 @@ type importEvidence struct {
 }
 
 type analysisState struct {
-	callables     []callableDeclaration
-	declarations  map[string][]string
-	parentIDs     map[string][]string
-	superclassIDs map[string][]string
-	facts         *factSet
-	fields        map[string]map[string][]fieldDeclaration
-	imports       []importEvidence
-	namespaces    map[string]string
-	relationships []relationshipEvidence
-	repositoryID  string
-	types         map[string][]typeDeclaration
+	callables                     []callableDeclaration
+	callablesByOwnerNameSignature map[callableIndexKey][]callableDeclaration
+	declarations                  map[string][]string
+	parentIDs                     map[string][]string
+	superclassIDs                 map[string][]string
+	facts                         *factSet
+	fields                        map[string]map[string][]fieldDeclaration
+	imports                       []importEvidence
+	namespaces                    map[string]string
+	relationships                 []relationshipEvidence
+	repositoryID                  string
+	typeKindsByID                 map[string]string
+	types                         map[string][]typeDeclaration
 }
 
 func analyzeRepository(repository string) ([]byte, error) {
@@ -47,7 +49,7 @@ func analyzeRepository(repository string) ([]byte, error) {
 	state := &analysisState{
 		declarations: make(map[string][]string), facts: facts, namespaces: make(map[string]string),
 		fields: make(map[string]map[string][]fieldDeclaration), repositoryID: repositoryID,
-		types: make(map[string][]typeDeclaration),
+		typeKindsByID: make(map[string]string), types: make(map[string][]typeDeclaration),
 	}
 	for _, manifest := range snapshot.manifests {
 		analyzeDependencyManifest(state, directoryIDs, manifest)
@@ -117,6 +119,10 @@ func (state *analysisState) registerDeclaration(qualifiedName, id string) {
 func (state *analysisState) registerType(qualifiedName, id, declarationKind string) {
 	state.registerDeclaration(qualifiedName, id)
 	state.types[qualifiedName] = append(state.types[qualifiedName], typeDeclaration{id: id, declarationKind: declarationKind})
+	if state.typeKindsByID == nil {
+		state.typeKindsByID = make(map[string]string)
+	}
+	state.typeKindsByID[id] = declarationKind
 }
 
 func appendUnique(items []string, item string) []string {
