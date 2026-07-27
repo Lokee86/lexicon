@@ -157,9 +157,7 @@ function resolveSymbol(facts: FactStore, moduleKey: string, scope: string[], nam
 }
 
 function findQualifiedName(facts: FactStore, id: string): string {
-  for (const [qualifiedName, symbolId] of facts.symbols) if (symbolId === id) return qualifiedName;
-  for (const [moduleKey, moduleId] of facts.modules) if (moduleId === id) return moduleKey;
-  return "";
+  return facts.qualifiedNamesById.get(id) ?? facts.moduleKeysById.get(id) ?? "";
 }
 
 function resolveImportTarget(

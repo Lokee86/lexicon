@@ -78,7 +78,10 @@ export class FactStore {
   readonly edges = new Map<string, Fact>();
   readonly unresolved = new Map<string, Fact>();
   readonly modules = new Map<string, string>();
+  readonly moduleKeysById = new Map<string, string>();
   readonly symbols = new Map<string, string>();
+  readonly qualifiedNamesById = new Map<string, string>();
+  readonly methodDeclarationsByName = new Map<string, { target: string; declaration: ts.MethodDeclaration }[]>();
   readonly ambiguousSymbols = new Set<string>();
   readonly bindings = new Map<string, Map<string, Binding>>();
   readonly imports: ImportInfo[] = [];
@@ -101,6 +104,14 @@ export class FactStore {
     const declarations = this.idDeclarations.get(id) ?? [];
     if (!declarations.includes(node)) declarations.push(node);
     this.idDeclarations.set(id, declarations);
+    if (ts.isMethodDeclaration(node) && ts.isClassDeclaration(node.parent)) {
+      const name = node.name.getText(node.getSourceFile());
+      const methods = this.methodDeclarationsByName.get(name) ?? [];
+      if (!methods.some((entry) => entry.target === id && entry.declaration === node)) {
+        methods.push({ target: id, declaration: node });
+        this.methodDeclarationsByName.set(name, methods);
+      }
+    }
   }
 
   addNode(

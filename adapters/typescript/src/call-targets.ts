@@ -67,7 +67,7 @@ function addImportedBindingTargets(
   if (!ts.isPropertyAccessExpression(unwrapped) || !ts.isIdentifier(unwrapped.expression)) return;
   const moduleId = facts.bindings.get(call.moduleKey)?.get(unwrapped.expression.text)?.targetId;
   if (!moduleId || facts.nodes.get(moduleId)?.kind !== "module") return;
-  const importedModuleKey = [...facts.modules].find(([, id]) => id === moduleId)?.[0];
+  const importedModuleKey = facts.moduleKeysById.get(moduleId);
   if (!importedModuleKey) return;
   const target = facts.bindings.get(importedModuleKey)?.get(unwrapped.name.text)?.targetId
     ?? facts.symbols.get(`${importedModuleKey}.${unwrapped.name.text}`);
@@ -94,7 +94,7 @@ function addDefaultImportTarget(
   if (!reference || !ts.isIdentifier(reference)) return;
   const binding = facts.bindings.get(call.moduleKey)?.get(reference.text);
   if (!binding?.targetId || facts.nodes.get(binding.targetId)?.kind !== "module") return;
-  const moduleKey = [...facts.modules].find(([, id]) => id === binding.targetId)?.[0];
+  const moduleKey = facts.moduleKeysById.get(binding.targetId);
   const exported = moduleKey ? facts.defaultExports.get(moduleKey) : undefined;
   if (!exported) return;
   for (const target of resolveExpressionTargets(facts, checker, exported, parameterTargets)) targets.add(target);
@@ -119,18 +119,15 @@ function expandDispatchTargets(
   const receiverType = checker.getTypeAtLocation(access.expression);
   if ((receiverType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) return targets;
   const implementations = new Set<string>();
-  for (const [target, declarations] of facts.idDeclarations) {
+  for (const { target, declaration } of facts.methodDeclarationsByName.get(methodName) ?? []) {
     if (facts.nodes.get(target)?.kind !== "method") continue;
-    for (const declaration of declarations) {
-      if (!ts.isMethodDeclaration(declaration) || declaration.name.getText(declaration.getSourceFile()) !== methodName) continue;
-      if ((ts.getModifiers(declaration) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)) continue;
-      const owner = declaration.parent;
-      if (!ts.isClassDeclaration(owner) || !owner.name) continue;
-      const symbol = checker.getSymbolAtLocation(owner.name);
-      if (!symbol) continue;
-      const instanceType = checker.getDeclaredTypeOfSymbol(symbol);
-      if (receiverAcceptsCandidate(checker, receiverType, instanceType)) implementations.add(target);
-    }
+    if ((ts.getModifiers(declaration) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)) continue;
+    const owner = declaration.parent;
+    if (!ts.isClassDeclaration(owner) || !owner.name) continue;
+    const symbol = checker.getSymbolAtLocation(owner.name);
+    if (!symbol) continue;
+    const instanceType = checker.getDeclaredTypeOfSymbol(symbol);
+    if (receiverAcceptsCandidate(checker, receiverType, instanceType)) implementations.add(target);
   }
   if (implementations.size === 0) return targets;
   const result = new Set<string>();

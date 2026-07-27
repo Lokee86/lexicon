@@ -19,14 +19,20 @@ export function emitFacts(facts: FactStore, changedFiles?: string[], removedFile
     header.removed_files = (removedFiles ?? []).map(normalizePath).sort();
     header.shared_complete = true;
   }
-  const nodes = Array.from(facts.nodes.values()).sort((a, b) => compareKeys(factSortKey(a), factSortKey(b)));
+  const nodes = sortedFacts(facts.nodes.values());
   const owners = new Map(nodes.map((record) => [String(record.id ?? ""), directOwner(record)]));
   const records = [
     ...nodes,
-    ...Array.from(facts.edges.values()).sort((a, b) => compareKeys(factSortKey(a), factSortKey(b))),
-    ...Array.from(facts.unresolved.values()).sort((a, b) => compareKeys(factSortKey(a), factSortKey(b))),
+    ...sortedFacts(facts.edges.values()),
+    ...sortedFacts(facts.unresolved.values()),
   ];
   return [header, ...(incremental ? records.filter((record) => includeRecord(record, owners, selected)) : records)];
+}
+
+function sortedFacts(records: Iterable<Fact>): Fact[] {
+  return Array.from(records, (record) => ({ key: factSortKey(record), record }))
+    .sort((left, right) => compareKeys(left.key, right.key))
+    .map(({ record }) => record);
 }
 
 function normalizePath(value: string): string {

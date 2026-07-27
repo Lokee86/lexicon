@@ -30,6 +30,7 @@ export function createFileContext(
   const moduleKey = moduleKeyFor(relativePath);
   const moduleId = facts.addNode("module", path.posix.basename(moduleKey), relativePath, moduleKey, moduleKey);
   facts.modules.set(moduleKey, moduleId);
+  facts.moduleKeysById.set(moduleId, moduleKey);
   facts.registerDeclaration(sourceFile, moduleId);
   facts.addEdge(fileId, moduleId, "contains", fileSpan);
   if (((sourceFile as ts.SourceFile & { parseDiagnostics?: ts.Diagnostic[] }).parseDiagnostics ?? []).length > 0) {
@@ -99,6 +100,7 @@ function addSymbol(kind: string, name: string, scope: string[], node: ts.Node, o
   if (!id) {
     id = facts.addNode(kind, name, context.relativePath, qualifiedName, qualifiedName, spanFor(node, context.sourceFile, context.relativePath));
     facts.symbols.set(qualifiedName, id);
+    facts.qualifiedNamesById.set(id, qualifiedName);
     facts.addEdge(ownerId, id, "defines", spanFor(node, context.sourceFile, context.relativePath));
   }
   facts.registerDeclaration(node, id);
