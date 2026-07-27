@@ -137,12 +137,9 @@ func (facts *factSet) render(repository string) ([]byte, error) {
 		"repository":      repository,
 		"schema_version":  1,
 	}
-	nodes := mapValues(facts.nodes)
-	edges := mapValues(facts.edges)
-	unresolved := mapValues(facts.unresolved)
-	sort.Slice(nodes, func(i, j int) bool { return nodeSortKey(nodes[i]) < nodeSortKey(nodes[j]) })
-	sort.Slice(edges, func(i, j int) bool { return edgeSortKey(edges[i]) < edgeSortKey(edges[j]) })
-	sort.Slice(unresolved, func(i, j int) bool { return unresolvedSortKey(unresolved[i]) < unresolvedSortKey(unresolved[j]) })
+	nodes := sortedMapValues(facts.nodes, nodeSortKey)
+	edges := sortedMapValuesByStoredKey(facts.edges)
+	unresolved := sortedMapValuesByStoredKey(facts.unresolved)
 
 	records := make([]map[string]any, 0, 1+len(nodes)+len(edges)+len(unresolved))
 	records = append(records, header)
@@ -161,10 +158,32 @@ func (facts *factSet) render(repository string) ([]byte, error) {
 	return []byte(output.String()), nil
 }
 
-func mapValues(input map[string]map[string]any) []map[string]any {
-	values := make([]map[string]any, 0, len(input))
-	for _, value := range input {
-		values = append(values, value)
+type keyedRecord struct {
+	key    string
+	record map[string]any
+}
+
+func sortedMapValues(input map[string]map[string]any, keyFor func(map[string]any) string) []map[string]any {
+	keyed := make([]keyedRecord, 0, len(input))
+	for _, record := range input {
+		keyed = append(keyed, keyedRecord{key: keyFor(record), record: record})
+	}
+	return sortedKeyedRecords(keyed)
+}
+
+func sortedMapValuesByStoredKey(input map[string]map[string]any) []map[string]any {
+	keyed := make([]keyedRecord, 0, len(input))
+	for key, record := range input {
+		keyed = append(keyed, keyedRecord{key: key, record: record})
+	}
+	return sortedKeyedRecords(keyed)
+}
+
+func sortedKeyedRecords(keyed []keyedRecord) []map[string]any {
+	sort.Slice(keyed, func(left, right int) bool { return keyed[left].key < keyed[right].key })
+	values := make([]map[string]any, len(keyed))
+	for index := range keyed {
+		values[index] = keyed[index].record
 	}
 	return values
 }
