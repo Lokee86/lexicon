@@ -117,6 +117,7 @@ See:
 - [Java and Kotlin adapter validation](JVM_ADAPTER_VALIDATION.md)
 - [Java and Kotlin corpus calibration](JVM_CORPUS_CALIBRATION.md)
 - [Java and Kotlin comparison with Codebase Memory](JVM_CBM_COMPARISON.md)
+- [Cross-adapter performance work](ADAPTER_PERFORMANCE.md)
 - [Evaluation harness](../evaluation/README.md)
 
 ## Explicit non-claims
