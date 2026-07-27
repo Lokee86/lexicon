@@ -18,6 +18,7 @@ type importEvidence struct {
 
 type analysisState struct {
 	callables                     []callableDeclaration
+	callablesByOwnerKindName      map[callableLookupKey][]callableDeclaration
 	callablesByOwnerNameSignature map[callableIndexKey][]callableDeclaration
 	declarations                  map[string][]string
 	parentIDs                     map[string][]string

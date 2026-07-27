@@ -31,6 +31,12 @@ type callableIndexKey struct {
 	signature string
 }
 
+type callableLookupKey struct {
+	constructor bool
+	name        string
+	ownerID     string
+}
+
 type fieldDeclaration struct {
 	id        string
 	modifiers []string
@@ -64,7 +70,7 @@ func (state *analysisState) resolveRuntimeSemantics() {
 		return state.callables[left].id < state.callables[right].id
 	})
 	state.indexDirectParents()
-	state.indexCallablesByOwnerNameSignature()
+	state.indexCallables()
 	state.emitOverrides()
 	for index := range state.callables {
 		callable := &state.callables[index]
@@ -76,11 +82,18 @@ func (state *analysisState) resolveRuntimeSemantics() {
 	}
 }
 
-func (state *analysisState) indexCallablesByOwnerNameSignature() {
+func (state *analysisState) indexCallables() {
+	state.callablesByOwnerKindName = make(map[callableLookupKey][]callableDeclaration)
 	state.callablesByOwnerNameSignature = make(map[callableIndexKey][]callableDeclaration)
 	for _, declaration := range state.callables {
-		key := callableIndexKey{ownerID: declaration.ownerID, name: declaration.name, signature: declaration.signature}
-		state.callablesByOwnerNameSignature[key] = append(state.callablesByOwnerNameSignature[key], declaration)
+		overrideKey := callableIndexKey{ownerID: declaration.ownerID, name: declaration.name, signature: declaration.signature}
+		state.callablesByOwnerNameSignature[overrideKey] = append(state.callablesByOwnerNameSignature[overrideKey], declaration)
+		lookupName := declaration.name
+		if declaration.constructor {
+			lookupName = ""
+		}
+		lookupKey := callableLookupKey{ownerID: declaration.ownerID, constructor: declaration.constructor, name: lookupName}
+		state.callablesByOwnerKindName[lookupKey] = append(state.callablesByOwnerKindName[lookupKey], declaration)
 	}
 }
 
@@ -114,11 +127,12 @@ func (state *analysisState) indexDirectParents() {
 func (state *analysisState) callableCandidates(ownerID, name string, arity int, constructor, staticOnly bool) []callableDeclaration {
 	var result []callableDeclaration
 	seen := make(map[string]bool)
-	for _, declaration := range state.callables {
-		if declaration.ownerID != ownerID || declaration.constructor != constructor || seen[declaration.id] {
-			continue
-		}
-		if !constructor && declaration.name != name {
+	if constructor {
+		name = ""
+	}
+	key := callableLookupKey{ownerID: ownerID, constructor: constructor, name: name}
+	for _, declaration := range state.callablesByOwnerKindName[key] {
+		if seen[declaration.id] {
 			continue
 		}
 		if staticOnly && !hasModifier(declaration.modifiers, "static") {

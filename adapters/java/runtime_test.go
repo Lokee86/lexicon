@@ -200,7 +200,7 @@ func TestOverrideIndexesScopeCandidatesAndTypeKinds(t *testing.T) {
 		declarations: make(map[string][]string),
 		types:        make(map[string][]typeDeclaration),
 	}
-	state.indexCallablesByOwnerNameSignature()
+	state.indexCallables()
 	candidates := state.overrideCandidates("parent", "run", "String")
 	if len(candidates) != 1 || candidates[0].id != "matching" {
 		t.Fatalf("override candidates = %#v, want only matching", candidates)
@@ -215,6 +215,36 @@ func TestOverrideIndexesScopeCandidatesAndTypeKinds(t *testing.T) {
 	if state.interfaceType("base") || state.interfaceType("missing") {
 		t.Fatal("interface type index classified a class or missing declaration as interface-like")
 	}
+}
+
+func TestCallableCandidateIndexPreservesLookupBehavior(t *testing.T) {
+	state := &analysisState{callables: []callableDeclaration{
+		{id: "method-z-varargs", ownerID: "target", name: "run", arity: 2, parameterTypes: []string{"String", "int..."}},
+		{id: "wrong-owner", ownerID: "other", name: "run", arity: 2},
+		{id: "method-a-fixed", ownerID: "target", name: "run", arity: 2, modifiers: []string{"static"}},
+		{id: "constructor-b", ownerID: "target", name: "Target", arity: 1, constructor: true},
+		{id: "wrong-name", ownerID: "target", name: "stop", arity: 2},
+		{id: "method-b-one", ownerID: "target", name: "run", arity: 1},
+		{id: "method-a-fixed", ownerID: "target", name: "run", arity: 2, modifiers: []string{"static"}},
+	}}
+	state.indexCallables()
+	assertIDs := func(label string, candidates []callableDeclaration, want []string) {
+		t.Helper()
+		got := make([]string, 0, len(candidates))
+		for _, candidate := range candidates {
+			got = append(got, candidate.id)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("%s candidates = %v, want %v", label, got, want)
+		}
+	}
+
+	assertIDs("overloads", state.callableCandidates("target", "run", 2, false, false), []string{"method-a-fixed", "method-z-varargs"})
+	assertIDs("one-argument overloads", state.callableCandidates("target", "run", 1, false, false), []string{"method-b-one", "method-z-varargs"})
+	assertIDs("varargs", state.callableCandidates("target", "run", 4, false, false), []string{"method-z-varargs"})
+	assertIDs("static", state.callableCandidates("target", "run", 2, false, true), []string{"method-a-fixed"})
+	assertIDs("instance", state.instanceCallableCandidates("target", "run", 2), []string{"method-z-varargs"})
+	assertIDs("constructors", state.callableCandidates("target", "ignored", 1, true, false), []string{"constructor-b"})
 }
 
 func TestRuntimeSemanticsAreCanonicalDeterministicAndCheckoutIndependent(t *testing.T) {
