@@ -46,12 +46,9 @@ func TestTypedIdentifierReceiverCallsStayBoundedAndScoped(t *testing.T) {
 	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", "calls", "receiver.inherited()", "unsupported-form")
 	assertNoRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", "demo.receivers.ReceiverBase.inherited()", "calls")
 	assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.local()", target, "calls")
-	for _, overload := range []string{
-		"demo.receivers.ReceiverTarget.overloaded(int)",
-		"demo.receivers.ReceiverTarget.overloaded(String)",
-	} {
-		assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.overloaded(ReceiverTarget)", overload, "possible-calls")
-	}
+	overloadedCaller := "demo.receivers.ReceiverCalls.overloaded(ReceiverTarget)"
+	assertRuntimeEdge(t, records, nodes, overloadedCaller, "demo.receivers.ReceiverTarget.overloaded(int)", "calls")
+	assertNoRuntimeEdge(t, records, nodes, overloadedCaller, "demo.receivers.ReceiverTarget.overloaded(String)", "possible-calls")
 
 	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.external(vendor.External)", "calls", "receiver.run()", "external-target")
 	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.ambiguous(SharedReceiver)", "calls", "receiver.run()", "ambiguous-target")
@@ -64,6 +61,48 @@ func TestTypedIdentifierReceiverCallsStayBoundedAndScoped(t *testing.T) {
 	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "unique(1)", "dynamic-target")
 	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "unknown.unique(1)", "dynamic-target")
 	assertNoRuntimeEdge(t, records, nodes, scope, "demo.receivers.ReceiverTarget.staticOnly()", "calls")
+	assertAllEndpoints(t, records, nodes)
+}
+
+func TestTypedReceiverOverloadsUseConservativeArgumentEvidence(t *testing.T) {
+	records := decodeRecords(t, analyzeFixture(t, runtimeFixture))
+	nodes := nodeIndex(records)
+	definite := map[string]string{
+		"demo.receivers.OverloadCalls.booleanLiteral(JsonWriterLike)":                     "boolean",
+		"demo.receivers.OverloadCalls.charLiteral(JsonWriterLike)":                        "char",
+		"demo.receivers.OverloadCalls.floatLiteral(JsonWriterLike)":                       "float",
+		"demo.receivers.OverloadCalls.floatingLiteral(JsonWriterLike)":                    "double",
+		"demo.receivers.OverloadCalls.integralLiteral(JsonWriterLike)":                    "long",
+		"demo.receivers.OverloadCalls.stringLiteral(JsonWriterLike)":                      "String",
+		"demo.receivers.OverloadCalls.typedBoolean(JsonWriterLike,Boolean)":               "Boolean",
+		"demo.receivers.OverloadCalls.typedLocal(JsonWriterLike)":                         "long",
+		"demo.receivers.OverloadCalls.typedRepositoryType(JsonWriterLike,ReceiverTarget)": "ReceiverTarget",
+		"demo.receivers.OverloadCalls.typedString(JsonWriterLike,String)":                 "String",
+	}
+	for caller, parameterType := range definite {
+		assertOnlyValueCall(t, records, nodes, caller, parameterType)
+	}
+
+	nullCaller := "demo.receivers.OverloadCalls.nullLiteral(JsonWriterLike)"
+	for _, parameterType := range []string{"Boolean", "Number", "ReceiverTarget", "String"} {
+		assertRuntimeEdge(t, records, nodes, nullCaller, valueTarget(parameterType), "possible-calls")
+	}
+	for _, parameterType := range []string{"boolean", "char", "double", "float", "long"} {
+		assertNoRuntimeEdge(t, records, nodes, nullCaller, valueTarget(parameterType), "possible-calls")
+	}
+
+	unknownCaller := "demo.receivers.OverloadCalls.unknownExpression(JsonWriterLike)"
+	for _, parameterType := range valueParameterTypes() {
+		assertRuntimeEdge(t, records, nodes, unknownCaller, valueTarget(parameterType), "possible-calls")
+	}
+
+	ambiguousCaller := "demo.receivers.OverloadCalls.ambiguousArguments(PairTarget,int,int)"
+	for _, target := range []string{
+		"demo.receivers.PairTarget.pair(int,long)",
+		"demo.receivers.PairTarget.pair(long,int)",
+	} {
+		assertRuntimeEdge(t, records, nodes, ambiguousCaller, target, "possible-calls")
+	}
 	assertAllEndpoints(t, records, nodes)
 }
 
@@ -179,6 +218,28 @@ func assertRuntimeEdge(t *testing.T, records []map[string]any, nodes map[string]
 		}
 	}
 	t.Fatalf("missing %s edge %s -> %s", relation, sourceName, targetName)
+}
+
+func assertOnlyValueCall(t *testing.T, records []map[string]any, nodes map[string]map[string]any, caller, parameterType string) {
+	t.Helper()
+	for _, candidateType := range valueParameterTypes() {
+		target := valueTarget(candidateType)
+		if candidateType == parameterType {
+			assertRuntimeEdge(t, records, nodes, caller, target, "calls")
+			assertNoRuntimeEdge(t, records, nodes, caller, target, "possible-calls")
+			continue
+		}
+		assertNoRuntimeEdge(t, records, nodes, caller, target, "calls")
+		assertNoRuntimeEdge(t, records, nodes, caller, target, "possible-calls")
+	}
+}
+
+func valueParameterTypes() []string {
+	return []string{"Boolean", "Number", "ReceiverTarget", "String", "boolean", "char", "double", "float", "long"}
+}
+
+func valueTarget(parameterType string) string {
+	return "demo.receivers.JsonWriterLike.value(" + parameterType + ")"
 }
 
 func assertNoRuntimeEdge(t *testing.T, records []map[string]any, nodes map[string]map[string]any, sourceName, targetName, relation string) {

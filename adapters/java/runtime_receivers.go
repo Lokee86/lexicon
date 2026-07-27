@@ -37,9 +37,6 @@ func receiverTypePrefix(tokens []token, start, end int) (string, int, bool) {
 		return "", start, false
 	}
 	typeName := first
-	if primitiveTypes[first] {
-		typeName = ""
-	}
 	index := start + 1
 	for {
 		if index < end && tokens[index].text == "<" {
@@ -204,7 +201,7 @@ func (state *analysisState) qualifiedCallCandidates(callable *callableDeclaratio
 	}
 	if !strings.Contains(invocation.qualifier, ".") {
 		if typeName, found := receivers.declaredType(invocation.qualifier, invocation.start); found {
-			if typeName == "" {
+			if typeName == "" || primitiveTypes[typeName] {
 				return nil, "dynamic-target"
 			}
 			return state.typedReceiverCandidates(callable, invocation, typeName)
@@ -237,4 +234,15 @@ func (state *analysisState) typedReceiverCandidates(callable *callableDeclaratio
 		return nil, "ambiguous-target"
 	}
 	return state.instanceCallableCandidates(types[0].id, invocation.name, invocation.arity), "unsupported-form"
+}
+
+func (state *analysisState) typedIdentifierReceiver(callable *callableDeclaration, invocation invocationEvidence, receivers receiverTypes) bool {
+	if invocation.qualifier == "this" || strings.Contains(invocation.qualifier, ".") {
+		return false
+	}
+	typeName, found := receivers.declaredType(invocation.qualifier, invocation.start)
+	if !found || typeName == "" || primitiveTypes[typeName] {
+		return false
+	}
+	return len(state.resolveTypeDeclarations(typeName, callable.ownerQualifiedName, callable.context)) == 1
 }

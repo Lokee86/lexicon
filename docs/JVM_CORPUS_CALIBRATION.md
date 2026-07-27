@@ -53,7 +53,19 @@ Java adapter `0.2.0` now resolves calls through explicitly typed callable parame
 | Gson | +2,448 | +5,423 | -3,345 |
 | HikariCP | +844 | +4 | -846 |
 
-Audit samples included `Document.head()`, `Element.text()`, `Element.html()`, `JsonWriter.beginArray()`, and `JsonWriter.endArray()`. The large Gson `possible-calls` increase is caused by same-arity overload families such as `JsonWriter.value(...)`. Those edges are explicitly uncertain rather than definite, but the fan-out is now the primary Java semantic-noise target. The next Java calibration slice should use conservative argument-type evidence to narrow obvious literal and explicitly typed identifier arguments without attempting compiler-equivalent overload resolution.
+Audit samples included `Document.head()`, `Element.text()`, `Element.html()`, `JsonWriter.beginArray()`, and `JsonWriter.endArray()`. The large Gson `possible-calls` increase was caused by same-arity overload families such as `JsonWriter.value(...)`. Those edges were explicitly uncertain rather than definite and motivated the bounded argument-evidence slice below.
+
+### Java argument evidence narrowing
+
+Java adapter `0.3.0` now narrows only same-arity overload candidates already selected through a proven typed parameter/local receiver. Evidence is limited to obvious null, boolean, string, char, integral, and floating-point literals plus explicitly typed simple parameter/local identifiers. Exact declared types and directly safe primitive conversion buckets may select a dominating candidate; unknown conversions, generic/varargs forms, multi-argument tradeoffs, and reference-only null ambiguity remain possible rather than guessed.
+
+| Case | Calls before / after | Possible calls before / after | Unresolved calls before / after |
+| --- | ---: | ---: | ---: |
+| jsoup | 7,561 / 7,855 (`+294`) | 5,226 / 4,622 (`-604`) | 16,302 / 16,302 |
+| Gson | 5,488 / 5,708 (`+220`) | 7,275 / 6,074 (`-1,201`) | 13,779 / 13,779 |
+| HikariCP | 1,531 / 1,531 | 28 / 28 | 4,118 / 4,118 |
+
+All three cases remained deterministic, passed facts-v1 and relation gates, and kept unresolved-call counts unchanged. Audited Gson definite samples included boolean, string, integral, float, and double literals at `JsonWriter.value(...)`. The remaining 371 `JsonWriter.value(...)` possible edges span 53 callsites dominated by member constants such as `Double.NaN`, casts such as `(long) value`, method-call arguments, and other expression forms intentionally outside this slice. Broader remaining Gson fan-out is concentrated in `Gson.fromJson`, `JsonPrimitive` constructors, and `Gson.toJson`; jsoup remains dominated by `Jsoup.parse` overloads. Resolving those families would require additional bounded evidence slices or compiler-equivalent work and was not included here.
 
 ### Kotlin extension and receiver resolution
 

@@ -1,6 +1,7 @@
 package main
 
 type invocationEvidence struct {
+	arguments  [][2]int
 	arity      int
 	end        int
 	expression string
@@ -47,7 +48,8 @@ func callableInvocation(callable *callableDeclaration, nameIndex int) (invocatio
 			kind:       "unsupported", name: name, start: nameIndex,
 		}, true
 	}
-	arity := len(splitTopLevel(tokens, nameIndex+2, close, ","))
+	arguments := splitTopLevel(tokens, nameIndex+2, close, ",")
+	arity := len(arguments)
 	if nameIndex+2 == close {
 		arity = 0
 	}
@@ -77,7 +79,7 @@ func callableInvocation(callable *callableDeclaration, nameIndex int) (invocatio
 		}
 	}
 	return invocationEvidence{
-		arity: arity, end: close + 1, expression: sourceExcerpt(callable.source, tokens, start, close+1),
+		arguments: arguments, arity: arity, end: close + 1, expression: sourceExcerpt(callable.source, tokens, start, close+1),
 		kind: kind, name: name, qualifier: qualifier, start: start,
 	}, true
 }
@@ -104,6 +106,9 @@ func (state *analysisState) emitInvocation(callable *callableDeclaration, invoca
 		candidates = state.callableCandidates(callable.ownerID, invocation.name, invocation.arity, false, false)
 	case "qualified":
 		candidates, reason = state.qualifiedCallCandidates(callable, invocation, receivers)
+		if state.typedIdentifierReceiver(callable, invocation, receivers) {
+			candidates = state.narrowArgumentCandidates(callable, invocation, receivers, candidates)
+		}
 	case "constructor":
 		types := state.resolveTypeDeclarations(invocation.qualifier, callable.ownerQualifiedName, callable.context)
 		if len(types) == 0 {
