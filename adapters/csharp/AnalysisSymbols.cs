@@ -20,6 +20,7 @@ internal sealed partial class Analysis
                               SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     private readonly Dictionary<ISymbol, string> symbolIds = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, string> qualifiedNames = new(SymbolEqualityComparer.Default);
 
     private void EmitDeclarations()
     {
@@ -86,7 +87,7 @@ internal sealed partial class Analysis
             name,
             path,
             qualifiedName,
-            identity: SymbolIdentity(symbol, location, owner),
+            identity: SymbolIdentity(symbol, qualifiedName, location, owner),
             span: location is null ? null : Span(path, location),
             attributes: attributes,
             owner: owner);
@@ -137,15 +138,25 @@ internal sealed partial class Analysis
             .FirstOrDefault();
     }
 
-    private static string QualifiedName(ISymbol symbol)
+    private string QualifiedName(ISymbol symbol)
     {
+        if (qualifiedNames.TryGetValue(symbol, out var known))
+        {
+            return known;
+        }
         var value = symbol.ToDisplayString(CanonicalFormat);
-        return string.IsNullOrWhiteSpace(value) ? symbol.MetadataName : value;
+        var qualifiedName = string.IsNullOrWhiteSpace(value) ? symbol.MetadataName : value;
+        qualifiedNames[symbol] = qualifiedName;
+        return qualifiedName;
     }
 
-    private static string SymbolIdentity(ISymbol symbol, Location? location, string? sourceOwner)
+    private string SymbolIdentity(
+        ISymbol symbol,
+        string qualifiedName,
+        Location? location,
+        string? sourceOwner)
     {
-        var identity = QualifiedName(symbol);
+        var identity = qualifiedName;
         if (symbol is ILocalSymbol or IParameterSymbol)
         {
             var owner = symbol.ContainingSymbol is null ? "" : QualifiedName(symbol.ContainingSymbol);

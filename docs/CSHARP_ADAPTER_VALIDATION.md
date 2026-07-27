@@ -52,6 +52,18 @@ When several literal target frameworks are declared, the adapter selects the new
 
 Large overload candidate sets remain bounded: one to four candidates emit `possible-calls`; larger sets emit one explicit `ambiguous-target` record with a bounded sample.
 
+## Performance follow-up
+
+A subsequent phase profile found repeated canonical display formatting for identical Roslyn symbols during declaration analysis. Caching qualified names by exact `ISymbol` identity and reusing the name during symbol-ID construction preserved the complete facts-v1 stream while reducing measured runtime.
+
+| Case | Baseline | Optimized warm pass | Change |
+| --- | ---: | ---: | ---: |
+| Dapper | 60.57 s | 54.18 s | 10.54% lower |
+| Polly | 169.45 s | 131.20 s | 22.58% lower |
+| Spectre.Console | 52.00 s average | 47.96 s average | 7.78% lower |
+
+The Spectre.Console figures are alternating-run averages. Dapper and Polly use the second optimized pass. All three optimized outputs were byte-identical to their baselines, passed JSONL validation, and were deterministic across repeated optimized runs. This optimization changes repeated formatting cost only; node identities, relationships, unresolved evidence, ordering, and repository metadata remain unchanged.
+
 ## Remaining limits
 
 Project evaluation depends on a compatible installed SDK and existing restore assets. Workspace diagnostics remain possible for custom build projects, unavailable generated outputs, repository-versioning targets, and project references whose design-time metadata is absent. Missing project-owned files remain represented through file fallback rather than disappearing.
