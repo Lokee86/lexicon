@@ -2,6 +2,29 @@ use crate::model::{Context, FunctionInfo};
 pub(crate) use crate::type_resolution::{is_builtin_path, is_external_path, value_from_type};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub(crate) fn build_qn_index(context: &mut Context) {
+    let mut index = BTreeMap::<String, BTreeSet<String>>::new();
+    for qn in context
+        .modules
+        .keys()
+        .chain(context.symbols.keys())
+        .chain(context.types.keys())
+        .chain(context.traits.keys())
+        .chain(context.macros.keys())
+        .chain(context.constructors.keys())
+        .chain(context.type_aliases.keys())
+        .chain(context.value_types.keys())
+    {
+        if let Some((_, name)) = qn.rsplit_once("::") {
+            index
+                .entry(name.to_string())
+                .or_default()
+                .insert(qn.clone());
+        }
+    }
+    context.qns_by_terminal = index;
+}
+
 pub(crate) fn resolve_type_ids(
     context: &Context,
     path: &str,
@@ -120,9 +143,12 @@ pub(crate) fn resolve_qns(
     if !path.contains("::") {
         return existing(
             context,
-            all_qns(context)
+            context
+                .qns_by_terminal
+                .get(&path)
                 .into_iter()
-                .filter(|qn| qn.ends_with(&format!("::{path}"))),
+                .flatten()
+                .cloned(),
         );
     }
     BTreeSet::new()
@@ -140,37 +166,35 @@ fn existing(context: &Context, candidates: impl IntoIterator<Item = String>) -> 
 }
 
 fn expand_module_reexport(context: &Context, candidate: &str) -> BTreeSet<String> {
-    let mut modules: Vec<_> = context
-        .modules
-        .keys()
-        .filter(|module| candidate.starts_with(&format!("{module}::")))
-        .collect();
-    modules.sort_by_key(|module| std::cmp::Reverse(module.len()));
-    for module in modules {
-        let rest = &candidate[module.len() + 2..];
-        let (first, suffix) = rest
-            .split_once("::")
-            .map(|(a, b)| (a, Some(b)))
-            .unwrap_or((rest, None));
-        let Some(targets) = context
-            .imports
-            .get(module)
-            .and_then(|scope| scope.bindings.get(first))
-        else {
-            continue;
-        };
-        let expanded: BTreeSet<_> = targets
-            .iter()
-            .filter_map(|target| {
-                let qn = suffix
-                    .map(|tail| format!("{target}::{tail}"))
-                    .unwrap_or_else(|| target.clone());
-                has_qn(context, &qn).then_some(qn)
-            })
-            .collect();
-        if !expanded.is_empty() {
-            return expanded;
+    let mut boundary = candidate.len();
+    while let Some(separator) = candidate[..boundary].rfind("::") {
+        let module = &candidate[..separator];
+        if context.modules.contains_key(module) {
+            let rest = &candidate[separator + 2..];
+            let (first, suffix) = rest
+                .split_once("::")
+                .map(|(a, b)| (a, Some(b)))
+                .unwrap_or((rest, None));
+            if let Some(targets) = context
+                .imports
+                .get(module)
+                .and_then(|scope| scope.bindings.get(first))
+            {
+                let expanded: BTreeSet<_> = targets
+                    .iter()
+                    .filter_map(|target| {
+                        let qn = suffix
+                            .map(|tail| format!("{target}::{tail}"))
+                            .unwrap_or_else(|| target.clone());
+                        has_qn(context, &qn).then_some(qn)
+                    })
+                    .collect();
+                if !expanded.is_empty() {
+                    return expanded;
+                }
+            }
         }
+        boundary = separator;
     }
     BTreeSet::new()
 }
@@ -220,19 +244,4 @@ fn has_qn(context: &Context, qn: &str) -> bool {
         || context.constructors.contains_key(qn)
         || context.type_aliases.contains_key(qn)
         || context.value_types.contains_key(qn)
-}
-
-fn all_qns(context: &Context) -> BTreeSet<String> {
-    context
-        .modules
-        .keys()
-        .chain(context.symbols.keys())
-        .chain(context.types.keys())
-        .chain(context.traits.keys())
-        .chain(context.macros.keys())
-        .chain(context.constructors.keys())
-        .chain(context.type_aliases.keys())
-        .chain(context.value_types.keys())
-        .cloned()
-        .collect()
 }

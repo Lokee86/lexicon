@@ -31,6 +31,7 @@ pub(crate) fn generate(
         constructor_types: BTreeMap::new(),
         type_aliases: BTreeMap::new(),
         value_types: BTreeMap::new(),
+        qns_by_terminal: BTreeMap::new(),
         type_qn_by_id: BTreeMap::new(),
         trait_qn_by_id: BTreeMap::new(),
         function_qn_by_id: BTreeMap::new(),

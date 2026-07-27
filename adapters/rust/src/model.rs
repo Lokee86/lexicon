@@ -36,19 +36,39 @@ pub(crate) struct ValueSet {
 
 impl ValueSet {
     pub(crate) fn merge(&mut self, other: &Self) -> bool {
-        let before = self.clone();
+        let mut changed = false;
+        let before = self.types.len();
         self.types.extend(other.types.iter().cloned());
+        changed |= self.types.len() != before;
+        let before = self.contained_types.len();
         self.contained_types
             .extend(other.contained_types.iter().cloned());
+        changed |= self.contained_types.len() != before;
+        let before = self.traits.len();
         self.traits.extend(other.traits.iter().cloned());
+        changed |= self.traits.len() != before;
+        let before = self.callables.len();
         self.callables.extend(other.callables.iter().cloned());
-        merge_value_lists(&mut self.tuple_elements, &other.tuple_elements);
-        merge_value_lists(&mut self.contained_values, &other.contained_values);
-        self.builtin |= other.builtin;
-        self.external |= other.external;
-        self.unknown |= other.unknown;
-        self.dynamic_callable |= other.dynamic_callable;
-        *self != before
+        changed |= self.callables.len() != before;
+        changed |= merge_value_lists(&mut self.tuple_elements, &other.tuple_elements);
+        changed |= merge_value_lists(&mut self.contained_values, &other.contained_values);
+        if other.builtin && !self.builtin {
+            self.builtin = true;
+            changed = true;
+        }
+        if other.external && !self.external {
+            self.external = true;
+            changed = true;
+        }
+        if other.unknown && !self.unknown {
+            self.unknown = true;
+            changed = true;
+        }
+        if other.dynamic_callable && !self.dynamic_callable {
+            self.dynamic_callable = true;
+            changed = true;
+        }
+        changed
     }
 
     pub(crate) fn callable(id: String, dynamic: bool) -> Self {
@@ -60,13 +80,16 @@ impl ValueSet {
     }
 }
 
-fn merge_value_lists(target: &mut Vec<ValueSet>, source: &[ValueSet]) {
+fn merge_value_lists(target: &mut Vec<ValueSet>, source: &[ValueSet]) -> bool {
+    let mut changed = false;
     if target.len() < source.len() {
         target.resize_with(source.len(), ValueSet::default);
+        changed = true;
     }
     for (index, value) in source.iter().enumerate() {
-        target[index].merge(value);
+        changed |= target[index].merge(value);
     }
+    changed
 }
 
 #[derive(Clone)]
@@ -156,6 +179,7 @@ pub(crate) struct Context {
     pub(crate) constructor_types: BTreeMap<String, String>,
     pub(crate) type_aliases: BTreeMap<String, String>,
     pub(crate) value_types: BTreeMap<String, String>,
+    pub(crate) qns_by_terminal: BTreeMap<String, BTreeSet<String>>,
     pub(crate) type_qn_by_id: BTreeMap<String, String>,
     pub(crate) trait_qn_by_id: BTreeMap<String, String>,
     pub(crate) function_qn_by_id: BTreeMap<String, String>,

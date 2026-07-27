@@ -44,6 +44,7 @@ pub(crate) fn extract(context: &mut Context) {
             );
         }
     }
+    crate::resolve::build_qn_index(context);
     crate::relationships::finalize(context);
 }
 
