@@ -104,12 +104,9 @@ func (facts *factSet) addUnresolved(source, relation, expression, reason, owner 
 }
 
 func (facts *factSet) render(repository string) ([]byte, error) {
-	nodes := values(facts.nodes)
-	edges := values(facts.edges)
-	unresolved := values(facts.unresolved)
-	sort.Slice(nodes, func(left, right int) bool { return nodeKey(nodes[left]) < nodeKey(nodes[right]) })
-	sort.Slice(edges, func(left, right int) bool { return edgeKey(edges[left]) < edgeKey(edges[right]) })
-	sort.Slice(unresolved, func(left, right int) bool { return unresolvedKey(unresolved[left]) < unresolvedKey(unresolved[right]) })
+	nodes := sortedValues(facts.nodes, nodeKey)
+	edges := sortedValues(facts.edges, edgeKey)
+	unresolved := sortedValues(facts.unresolved, unresolvedKey)
 
 	header := map[string]any{
 		"adapter_version": adapterVersion,
@@ -135,10 +132,20 @@ func (facts *factSet) render(repository string) ([]byte, error) {
 	return output.Bytes(), nil
 }
 
-func values(records map[string]map[string]any) []map[string]any {
-	result := make([]map[string]any, 0, len(records))
+type keyedRecord struct {
+	key    string
+	record map[string]any
+}
+
+func sortedValues(records map[string]map[string]any, keyFor func(map[string]any) string) []map[string]any {
+	keyed := make([]keyedRecord, 0, len(records))
 	for _, record := range records {
-		result = append(result, record)
+		keyed = append(keyed, keyedRecord{key: keyFor(record), record: record})
+	}
+	sort.Slice(keyed, func(left, right int) bool { return keyed[left].key < keyed[right].key })
+	result := make([]map[string]any, len(keyed))
+	for index := range keyed {
+		result[index] = keyed[index].record
 	}
 	return result
 }
