@@ -19,18 +19,20 @@ Codebase Memory `full` mode also adds `SIMILAR_TO` and `SEMANTICALLY_RELATED` ed
 
 ## Runtime
 
-| Repository | Codebase Memory | Lexicon warm pass | Lexicon / CBM |
+The initial comparison measured Lexicon's six warm passes at 100.99 seconds. Profiling showed that most CPU time was not semantic analysis: sort comparators repeatedly serialized complete fact maps to JSON while ordering records. Java and Kotlin now precompute each canonical sort key once. Additional indexes remove repeated global scans during Java callable resolution and Kotlin member and companion resolution.
+
+| Repository | Codebase Memory | Optimized Lexicon warm pass | Lexicon / CBM |
 | --- | ---: | ---: | ---: |
-| jsoup | 2.71 s | 20.20 s | 7.46x |
-| Gson | 2.60 s | 18.36 s | 7.06x |
-| HikariCP | 1.25 s | 6.88 s | 5.52x |
-| detekt | 8.87 s | 31.16 s | 3.51x |
-| kotlinx.coroutines | 6.84 s | 18.34 s | 2.68x |
-| Now in Android | 2.45 s | 6.04 s | 2.46x |
+| jsoup | 2.71 s | 2.39 s | 0.88x |
+| Gson | 2.60 s | 2.38 s | 0.92x |
+| HikariCP | 1.25 s | 0.79 s | 0.64x |
+| detekt | 8.87 s | 3.15 s | 0.36x |
+| kotlinx.coroutines | 6.84 s | 2.14 s | 0.31x |
+| Now in Android | 2.45 s | 1.13 s | 0.46x |
 
-Across all six repositories, Codebase Memory completed in 24.71 seconds and Lexicon's warm passes completed in 100.99 seconds. Codebase Memory was 4.09 times faster overall, 6.93 times faster on Java, and 3.06 times faster on Kotlin.
+Across all six repositories, the optimized Lexicon warm passes completed in 11.98 seconds, down from 100.99 seconds. That is an 8.43x improvement. In these local runs, Codebase Memory completed in 24.71 seconds, so optimized Lexicon was 2.06 times faster overall: 1.18 times faster on Java and 2.83 times faster on Kotlin.
 
-This is a decisive Codebase Memory advantage. Lexicon's current deterministic parsing, canonical fact construction, unresolved-evidence retention, and JSONL materialization cost substantially more CPU and output work.
+All six optimized outputs remained deterministic and retained the previous byte counts, SHA-256 digests, relationship counts, unresolved counts, and facts-v1 ordering. The optimization changed lookup and rendering cost, not semantic output.
 
 ## Structural model differences
 
@@ -107,13 +109,10 @@ Java breadth is relatively close once Lexicon's possible targets are included, a
 
 The comparison supports keeping both architectural approaches distinct.
 
-Codebase Memory is substantially faster and produces a richer exploration graph. Its complexity properties, testing relationships, configuration detection, HTTP relationships, and heuristic recall are useful reference points for future Lexicon consumers or a separate non-authoritative navigation layer.
+Codebase Memory produces a richer exploration graph, while the optimized Lexicon JVM adapters were faster on the pinned local corpus. Codebase Memory's complexity properties, testing relationships, configuration detection, HTTP relationships, and heuristic recall remain useful reference points for future Lexicon consumers or a separate non-authoritative navigation layer.
 
 Lexicon's JVM adapters are stronger for conservative semantic evidence. Java preserves overload identity and exposes unresolved applicability instead of collapsing overload families. Kotlin resolves the tested explicitly typed repository-local extension slice more precisely and assigns edges to the actual enclosing callable. Lexicon also preserves implementation, override, dependency, possible-target, and unresolved evidence that was absent or combined in the compared Codebase Memory graphs.
 
-The adapters should therefore be considered successful for Lexicon's intended contract, but not finished in an absolute sense. The comparison identifies two clear priorities:
-
-1. reduce Java and Kotlin runtime without weakening canonical identities or certainty boundaries;
-2. expand Kotlin receiver and extension evidence in bounded slices while keeping heuristic navigation separate from facts-v1.
+The adapters should therefore be considered successful for Lexicon's intended contract, but not finished in an absolute sense. The runtime defect exposed by the comparison has been addressed without weakening canonical identities or certainty boundaries. The remaining priority is to expand Kotlin receiver and extension evidence in bounded slices while keeping heuristic navigation separate from facts-v1.
 
 A useful future design is an optional exploration overlay with confidence and strategy metadata, influenced by Codebase Memory's breadth, while retaining Lexicon's current facts-v1 stream as the authoritative semantic layer.
