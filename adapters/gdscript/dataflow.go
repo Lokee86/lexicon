@@ -117,11 +117,13 @@ func gdscriptLocalTarget(facts *factSet, functionID, name string, reference toke
 	if functionID == "" {
 		return ""
 	}
+	facts.ensureDataflowDeclarationIndexes()
 	bestID := ""
 	bestLine, bestColumn := -1, -1
 	ambiguous := false
-	for id, decl := range facts.declarationByID {
-		if decl.ownerFunction != functionID || decl.name != name || (decl.kind != "variable" && decl.kind != "constant") {
+	for _, id := range facts.dataflowLocalByFunctionName[functionID][name] {
+		decl := facts.declarationByID[id]
+		if decl == nil {
 			continue
 		}
 		line := spanInt(decl.span, "start_line")
@@ -167,6 +169,7 @@ func declarationContainsToken(decl *declaration, reference token) bool {
 }
 
 func gdscriptMemberTargetID(model *semanticModel, context analysisContext, receiver []token, name string) string {
+	model.facts.ensureDataflowDeclarationIndexes()
 	owners := ownerSet{}
 	if simpleIdentifier(receiver) == "self" {
 		if context.ownerID != "" {
@@ -177,10 +180,8 @@ func gdscriptMemberTargetID(model *semanticModel, context analysisContext, recei
 	}
 	candidates := make(map[string]struct{})
 	for owner := range owners {
-		for id, decl := range model.facts.declarationByID {
-			if decl.ownerID == owner && decl.name == name && (decl.kind == "variable" || decl.kind == "constant") {
-				candidates[id] = struct{}{}
-			}
+		for _, id := range model.facts.dataflowMemberByOwnerName[owner][name] {
+			candidates[id] = struct{}{}
 		}
 	}
 	if len(candidates) != 1 {

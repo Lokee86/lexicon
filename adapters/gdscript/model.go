@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"path/filepath"
 )
 
@@ -37,6 +36,8 @@ type factSet struct {
 	fileByDeclarationID         map[string]*parsedFile
 	declaredMemberByOwner       map[string]map[string]bool
 	declaredLocalByFunction     map[string]map[string]bool
+	dataflowMemberByOwnerName   map[string]map[string][]string
+	dataflowLocalByFunctionName map[string]map[string][]string
 	parentByOwnerID             map[string][]string
 	externalParentByOwnerID     map[string]bool
 	scriptOwnerByPath           map[string]string
@@ -109,15 +110,6 @@ func (f *factSet) addEdge(record map[string]any) {
 	f.indexStaticFunction(record)
 }
 
-func (f *factSet) addDataflowEdge(record map[string]any) {
-	key := fmt.Sprintf("%s\x00%s\x00%s", record["source"], record["target"], record["relation"])
-	if _, exists := f.dataflowKeys[key]; exists {
-		return
-	}
-	f.dataflowKeys[key] = struct{}{}
-	f.addEdge(record)
-}
-
 func (f *factSet) indexClassMethod(record map[string]any) {
 	if record["relation"] != "defines" {
 		return
@@ -170,6 +162,7 @@ func (f *factSet) indexDeclaration(pf *parsedFile, decl *declaration) {
 			}
 			f.declaredMemberByOwner[decl.ownerID][decl.name] = true
 		}
+		f.indexDataflowDeclaration(decl)
 	}
 	if decl.kind == "type" && decl.keyword != "class_name" {
 		if f.typeByOwnerID[decl.ownerID] == nil {

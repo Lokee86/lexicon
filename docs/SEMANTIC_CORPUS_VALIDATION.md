@@ -45,6 +45,8 @@ The parser now rejects unterminated calls. Local dataflow resolution selects the
 
 Before the dataflow fix, repeated Space Rocks client scans differed by 77 edges. After the fix, both 40 MB outputs had SHA-256 `bc91f069f6811270d3728bc1be41315305a3d0005ec02a290ccc6bb648559550`.
 
+A later performance profile found that the deterministic nearest-prior and unique-member rules were implemented with repository-wide declaration scans for every identifier and member reference. Function/name and owner/name indexes now narrow those lookups without changing the selection rules. On a frozen 526-file Space Rocks client snapshot, alternating baseline and optimized scans averaged 61.87 seconds and 7.43 seconds respectively, while all outputs remained byte-identical.
+
 ## Interpretation
 
 This run establishes that the added call, possible-call, read, write, dependency, inheritance, override, and related semantic streams are implemented, survive representative repositories, and are deterministic for the current corpus.

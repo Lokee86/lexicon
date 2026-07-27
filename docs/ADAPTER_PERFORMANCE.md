@@ -22,6 +22,23 @@ The optimized validation emitted the same 41,520,048-byte facts-v1 stream with S
 
 The smaller Space Rocks web and Workspace MCP cases completed in 6.45 and 6.78 seconds in the final concurrent corpus run. These repositories are not revision-pinned, so their timings and output counts are supporting observations rather than controlled before-and-after comparisons.
 
+## GDScript
+
+Phase profiling on a frozen 526-file snapshot of the Space Rocks client found that dataflow dominated runtime. The initial profiled pass spent 80.18 of 89.71 seconds in dataflow, while parsing, semantic modeling, call resolution, and rendering together accounted for less than 10 seconds.
+
+Every identifier read called `gdscriptLocalTarget`, which scanned every repository declaration to find same-named locals in the current function. Every member read or write called `gdscriptMemberTargetID`, which performed another repository-wide declaration scan for each inferred receiver owner. The adapter now maintains narrow declaration indexes by function/name and owner/name. Lookup still applies the existing nearest-prior local, declaration-span, ambiguity, and unique-member rules; only the candidate search space changed.
+
+The live Space Rocks checkout was being edited concurrently, so the controlled comparison used one frozen source snapshot. An alternating baseline/optimized/optimized/baseline run measured:
+
+| Metric | Baseline | Optimized | Change |
+| --- | ---: | ---: | ---: |
+| Average runtime | 61.87 s | 7.43 s | 87.99% lower; 8.32x faster |
+| Profiled dataflow phase | 80.18 s initial profile | 545 ms optimized profile | 99.32% lower |
+
+All four alternating runs and the profiled optimized run emitted the same 44,219,265-byte facts-v1 stream with SHA-256 `ee51c7622f0a773701a11ce7cd26c518d2586d601af8c86a1f487a49d346c598`. The timer-free production build emitted the same stream again.
+
+After the dataflow fix, semantic-model convergence is the largest measured phase: 5.11 seconds across nine fixed-point iterations, including 2.85 seconds of argument propagation. That is the next evidence-backed GDScript performance target; it was not changed in this slice.
+
 ## Generic fallback
 
 The generic adapter previously rebuilt formatted composite keys inside Go sort comparators. It now computes one key per record and sorts keyed records.
@@ -71,7 +88,7 @@ Both versions emitted identical deterministic facts-v1 streams. The cached-key c
 
 The exact Java/Kotlin defect is not present throughout the remaining fleet:
 
-- GDScript already uses keyed-record sorting;
+- GDScript already uses keyed-record sorting; its measured bottleneck was repeated repository-wide declaration lookup during dataflow;
 - Python's `sorted(..., key=...)` computes each key once;
 - Ruby's `sort_by` computes each key once;
 - Go compares typed fields and spans directly rather than serializing records in comparators;
@@ -89,6 +106,7 @@ Accepted changes passed:
 - full TypeScript corpus validation with no failures;
 - repeated deterministic facts-v1 validation;
 - byte-identical generic-C corpus comparison;
+- GDScript race-enabled adapter tests and byte-identical frozen Space Rocks baseline/optimized comparisons;
 - C# smoke, MSBuild graph, relation, incremental, and determinism checks;
 - byte-identical baseline/optimized comparisons across Spectre.Console, Dapper, and Polly.
 
