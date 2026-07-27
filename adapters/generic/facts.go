@@ -76,11 +76,9 @@ func (facts *factSet) addImport(path, moduleID, keyword, target string, lineNumb
 }
 
 func (facts *factSet) render(repository string, changedFiles, removedFiles []string, incremental bool) []byte {
-	sort.Slice(facts.nodes, func(left, right int) bool { return nodeSortKey(facts.nodes[left]) < nodeSortKey(facts.nodes[right]) })
-	sort.Slice(facts.edges, func(left, right int) bool { return edgeSortKey(facts.edges[left]) < edgeSortKey(facts.edges[right]) })
-	sort.Slice(facts.unresolved, func(left, right int) bool {
-		return unresolvedSortKey(facts.unresolved[left]) < unresolvedSortKey(facts.unresolved[right])
-	})
+	sortRecordsByKey(facts.nodes, nodeSortKey)
+	sortRecordsByKey(facts.edges, edgeSortKey)
+	sortRecordsByKey(facts.unresolved, unresolvedSortKey)
 	header := map[string]any{
 		"adapter_version": adapterVersion, "language": facts.language, "record": "lexicon",
 		"repository": repository, "schema_version": 1,
@@ -100,6 +98,22 @@ func (facts *factSet) render(repository string, changedFiles, removedFiles []str
 		}
 	}
 	return output.Bytes()
+}
+
+type keyedFactRecord struct {
+	key    string
+	record map[string]any
+}
+
+func sortRecordsByKey(records []map[string]any, keyFor func(map[string]any) string) {
+	keyed := make([]keyedFactRecord, len(records))
+	for index, record := range records {
+		keyed[index] = keyedFactRecord{key: keyFor(record), record: record}
+	}
+	sort.Slice(keyed, func(left, right int) bool { return keyed[left].key < keyed[right].key })
+	for index := range keyed {
+		records[index] = keyed[index].record
+	}
 }
 
 func (facts *factSet) nodeID(kind, canonical string) string {
