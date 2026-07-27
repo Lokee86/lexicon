@@ -31,6 +31,7 @@ Lexicon documentation follows these rules:
 | [CSHARP_ADAPTER_VALIDATION.md](CSHARP_ADAPTER_VALIDATION.md) | Dated C# semantic-adapter calibration and validation record |
 | [JVM_ADAPTER_VALIDATION.md](JVM_ADAPTER_VALIDATION.md) | Dated Java and Kotlin fixture, contract, determinism, and boundary validation record |
 | [JVM_CORPUS_CALIBRATION.md](JVM_CORPUS_CALIBRATION.md) | Pinned Java/Kotlin calibration, validation, holdout, measurements, stress findings, and next priorities |
+| [JVM_CBM_COMPARISON.md](JVM_CBM_COMPARISON.md) | Dated Java/Kotlin runtime and semantic comparison with Codebase Memory 0.9.0 |
 | [RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) | Distribution layout, build requirements, runtime requirements, and packaging command |
 
 ## Related documentation
