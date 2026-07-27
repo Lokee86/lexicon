@@ -79,13 +79,24 @@ Kotlin adapter `0.4.0` now resolves repository-local extension calls through exp
 
 All 19 additions were audited as concrete repository-local bindings. Examples include `createKtFile(...)`, `getDefaultConfiguration()`, `createSpec(...)`, `list(...)`, and `listOfMaps(...)`. No holdout-only relaxation or name-only fallback was added.
 
+## Java scalability stress results
+
+Apache Maven at `b646a7a38e920f7590e7b25fb43b5756d8bf2b4d` and OpenJDK JMH at `a194eead0136bb66e5e59e4fdb2e18543e730929` remain stress repositories rather than normal holdout gates. Profiling showed that repeated whole-edge scans during direct-parent lookup dominated Java runtime resolution; the suspected global callable scan was not the measured bottleneck.
+
+The adapter now builds sorted, de-duplicated direct-parent and direct-superclass indexes once before override and call resolution. Accepted jsoup, Gson, and HikariCP output remained byte-identical to Java adapter `0.2.0` before overload narrowing.
+
+| Repository | Before | After | Completed output |
+| --- | ---: | ---: | ---: |
+| JMH | Did not complete within 90.063 s | 21.084 s | 53,930,211 B / 102,505 records |
+| Maven | Did not complete within 90.082 s | 150.523 s | 233,223,312 B / 427,111 records |
+
+JMH completed at least 4.27 times faster than the bounded baseline. The Maven memory measurements are not phase-equivalent because the baseline was terminated before rendering output, while the optimized run completed and retained a 233 MB JSONL stream. This change addresses CPU scaling; it does not change the adapter's whole-output memory model.
+
+Both stress outputs passed facts-v1 validation. Repeated optimized JMH runs were byte-identical. Maven completed with 88,684 nodes, 178,172 edges, and 160,254 unresolved records; JMH completed with 22,788 nodes, 48,576 edges, and 31,140 unresolved records.
+
 ## Remaining priorities
 
-### Java scalability
-
-Apache Maven and OpenJDK JMH were also cloned as stress repositories. Apache Maven remained CPU-bound for more than 15 minutes at roughly 428 MB without producing its first output stream. JMH also failed to complete within the bounded exploratory run. Both are excluded from the normal holdout gate until the Java adapter's large-repository runtime path is profiled and bounded.
-
-This is a separate problem from semantic coverage. The likely investigation target is repeated global candidate scanning during runtime resolution, but profiling is required before changing the implementation.
+Further Java semantic narrowing should remain bounded and evidence-driven. The largest remaining possible-call families are `Jsoup.parse`, `Gson.fromJson`, `JsonPrimitive` constructors, and `Gson.toJson`; resolving them would require additional expression evidence or compiler-equivalent attribution. Kotlin's principal remaining gaps are inferred, safe-call, chained, and fluent-result receiver binding plus Gradle/source-set semantics.
 
 ## Commands
 
