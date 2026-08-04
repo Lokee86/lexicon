@@ -81,3 +81,7 @@ Before submitting a change, confirm:
 - generated files and caches are not committed;
 - relevant documentation is current;
 - focused and complete verification passed.
+
+## Contribution licensing
+
+Code or documentation contributions are not accepted unless the contributor first signs a separate written contributor agreement approved by the licensor. Issue reports and design proposals remain welcome.
