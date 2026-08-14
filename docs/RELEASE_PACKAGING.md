@@ -28,6 +28,7 @@ The release directory contains:
 - `adapters/go/lexicon-go`;
 - `adapters/gdscript/lexicon-gdscript`;
 - `adapters/generic/lexicon-generic`;
+- the compiler-backed Java adapter, minimized private Java runtime, and compiler helper under `adapters/java/`;
 - the host-specific self-contained C# adapter under `adapters/csharp/`;
 - `adapters/rust/lexicon-rust`;
 - the compiled TypeScript `dist/cli.js`;
@@ -43,7 +44,8 @@ The packaged executable discovers the adjacent `adapters/` directory automatical
 
 Creating a complete distribution requires:
 
-- Go for the application, Go adapter, GDScript adapter, and generic adapter;
+- Go for the application, Go adapter, GDScript adapter, generic adapter, and Java adapter host executable;
+- JDK 21 or newer to compile the Java semantic helper and create its minimized runtime;
 - Rust and Cargo for the Rust adapter;
 - Node.js and npm for TypeScript compilation and production dependency installation;
 - a .NET 8 SDK for the self-contained C# adapter publish;
@@ -53,7 +55,7 @@ The packaging process must build from a verified source tree. It does not replac
 
 ## Runtime requirements
 
-A packaged distribution does not require Go, Cargo, npm, the TypeScript compiler, or a separately installed .NET runtime. The C# adapter is published self-contained for the host operating system and architecture.
+A packaged distribution does not require Go, Cargo, npm, the TypeScript compiler, a system JDK, or a separately installed .NET runtime. The Java adapter carries a private minimized runtime; the C# adapter is published self-contained for the host operating system and architecture.
 
 The self-contained C# executable can always use file mode without a separate runtime. MSBuild project loading additionally requires a compatible .NET SDK and existing project restore assets on the analysis machine. If those are unavailable, normal `auto` mode falls back to file analysis; `--project-loading msbuild` fails explicitly.
 

@@ -91,7 +91,7 @@ func (state *analysis) externalModule(dependency dependencyEvidence) string {
 	if dependency.version != "" {
 		attributes["version"] = dependency.version
 	}
-	path := ".lexicon/dependencies/maven/" + strings.ReplaceAll(dependency.coordinate, ":", "/")
+	path := "@dependencies/maven/" + strings.ReplaceAll(dependency.coordinate, ":", "/")
 	return state.facts.addNode(
 		"module", "dependency:maven:"+dependency.coordinate, dependency.artifact, path,
 		dependency.coordinate, "", nil, attributes,

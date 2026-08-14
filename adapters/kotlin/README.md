@@ -116,6 +116,15 @@ These exclusions cover repository metadata, linked-worktree metadata, Warlock st
 
 Files are discovered in canonical path order. Node identities use SHA-256, attributes use deterministic scalar values or sorted arrays, duplicate records are keyed canonically, and emission follows facts-v1 ordering: header, nodes, edges, then unresolved records. JSON object keys are lexicographically ordered by Go's JSON encoder. Identical source bytes and repository directory identity produce byte-identical output.
 
+## Code map
+
+| Concern | Primary implementation | Verification |
+| --- | --- | --- |
+| Discovery, parsing, and declarations | `discovery.go`, `parser*.go`, `analysis_declarations.go` | foundation adapter tests |
+| Type, import, and relationship resolution | `analysis_resolution.go`, `analysis_relationships.go`, `analysis_imports.go` | relationship fixtures |
+| Calls, extensions, overrides, reads, and writes | `analysis_runtime_*.go` | runtime and extension-call tests |
+| Gradle and Maven dependency evidence | `dependency_analysis.go`, `gradle_dependencies.go`, `maven_dependencies.go` | dependency tests |
+
 ## Tests
 
 ```text

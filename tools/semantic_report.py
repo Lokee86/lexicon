@@ -18,6 +18,7 @@ VALIDATOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VALIDATOR)
 
 DISPATCH_RELATIONS = {"extends", "implements", "uses-trait", "includes", "overrides"}
+STRUCTURAL_RELATIONS = {"contains", "defines"}
 
 
 def load_stream(path: Path) -> list[dict[str, Any]]:
@@ -37,12 +38,19 @@ def summarize(path: Path) -> dict[str, Any]:
     nodes = Counter()
     edges = Counter()
     unresolved = Counter()
+    semantic_endpoints: set[str] = set()
+    compiler_edges = Counter()
     for record in records[1:]:
         kind = record["record"]
         if kind == "node":
             nodes[record["kind"]] += 1
         elif kind == "edge":
-            edges[record["relation"]] += 1
+            relation = record["relation"]
+            edges[relation] += 1
+            if relation not in STRUCTURAL_RELATIONS:
+                semantic_endpoints.update((record["source"], record["target"]))
+            if record.get("attributes", {}).get("resolution") == "javac":
+                compiler_edges[relation] += 1
         else:
             unresolved[record["relation"]] += 1
 
@@ -52,6 +60,10 @@ def summarize(path: Path) -> dict[str, Any]:
     call_total = call_definite + call_possible + call_unresolved
     dataflow_edges = edges["reads"] + edges["writes"]
     dispatch_edges = sum(edges[relation] for relation in DISPATCH_RELATIONS)
+    node_total = sum(nodes.values())
+    edge_total = sum(edges.values())
+    structural_edges = sum(edges[relation] for relation in STRUCTURAL_RELATIONS)
+    semantic_edges = edge_total - structural_edges
 
     return {
         "adapter_version": header["adapter_version"],
@@ -65,6 +77,18 @@ def summarize(path: Path) -> dict[str, Any]:
             "dependencies": edges["depends-on"] > 0,
             "dispatch_relationships": dispatch_edges > 0,
             "runtime_evidence": False,
+        },
+        "connectivity": {
+            "compiler_resolved_edges": sum(compiler_edges.values()),
+            "compiler_resolved_relations": dict(sorted(compiler_edges.items())),
+            "edge_density": ratio(edge_total, node_total),
+            "semantic_edge_density": ratio(semantic_edges, node_total),
+            "semantic_endpoint_fraction": ratio(len(semantic_endpoints), node_total),
+            "semantic_endpoints": len(semantic_endpoints),
+            "semantic_edges": semantic_edges,
+            "structural_edges": structural_edges,
+            "total_edges": edge_total,
+            "total_nodes": node_total,
         },
         "edge_relations": dict(sorted(edges.items())),
         "language": header["language"],

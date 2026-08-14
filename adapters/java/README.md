@@ -1,16 +1,17 @@
 # Java adapter
 
-The Java adapter is a self-contained Go executable that reads Java source and supported Maven/Gradle manifests as data and emits the Lexicon facts-v1 JSONL contract. It does not load classes, invoke build tools, evaluate build logic, run annotation processors, resolve installed dependencies, or execute analyzed project code.
+The Java adapter combines Lexicon's deterministic source/dependency model with a compiler-backed semantic pass built on the public `jdk.compiler` API. It parses repository source without running project code or annotation processors, then uses javac attribution to resolve repository-local calls, constructors, inheritance, overrides, type references, and field/parameter access. Release packages include a private minimized Java runtime and compiler helper.
 
 ## Build
 
-Go 1.26 or newer is required. From this directory:
+Go 1.26 or newer and JDK 21 or newer are required for source-tree development. Install the repository-local verified Temurin JDK when needed:
 
 ```text
+python tools/bootstrap_jdk.py
 go build -o lexicon-java .
 ```
 
-No JDK, Java dependency download, or analyzed-project build is required.
+The adapter discovers `LEXICON_JDK_HOME`, `JAVA_HOME`, the repository-local `.tools/jdk`, or `java`/`javac` on `PATH`. Packaged releases use their bundled private runtime and do not require a system JDK. The analyzed project is not built and its dependencies are not downloaded.
 
 ## Usage
 
@@ -41,11 +42,11 @@ The foundation models:
 - sealed-type `permits` references marked with `role: permitted-subtype`;
 - annotation applications on modeled declarations;
 - retained callable-body token ranges for modeled methods and constructors with bodies;
-- definite same-owner, explicitly typed parameter/local identifier receiver, explicit repository-type-qualified static, object-construction, and explicit `this`/`super` constructor calls when bounded lookup evidence proves one repository-local target;
-- conservative literal and explicitly typed simple-identifier argument evidence for narrowing same-arity overloads already selected through a proven typed receiver;
-- `possible-calls` edges for the repository-local overloads that remain after bounded owner/name/arity and argument-evidence narrowing;
-- conservative direct-parent `overrides` edges for methods with identical declared names and normalized parameter signatures;
-- simple modeled field and parameter `reads`/`writes`, including assignment and increment/decrement writes;
+- javac-attributed repository-local method, inherited method, static method, constructor, explicit `this`/`super`, and overload-resolved `calls` edges;
+- conservative `possible-calls` fallback evidence when source errors or missing classpaths prevent javac from selecting one repository-local target;
+- compiler-verified `overrides` edges across modeled repository-local ancestry;
+- compiler-attributed field and parameter `reads`/`writes`, including assignment, compound assignment, and increment/decrement access;
+- repository-local type `references` from callable returns, parameters, fields, locals, generic arguments, arrays, and member references;
 - literal direct Maven dependency coordinates from `pom.xml`, including version, scope, and optional metadata;
 - literal supported Gradle Groovy/Kotlin dependency declarations, with configuration and source-span evidence;
 - deterministic external dependency modules and `depends-on` edges, while computed, catalog-backed, project, platform, profile, dependency-management, plugin, and other unsupported forms remain unresolved;
@@ -59,11 +60,9 @@ Declared type-header references resolve only to repository-local type declaratio
 
 Annotations on modeled types, constructors, methods, fields, record components, and parameters use the same conservative lookup. A uniquely resolved repository-local annotation declaration is the target of an `annotates` edge from the annotated declaration. External annotations and ambiguous local annotation names remain unresolved `annotates` evidence, preserving the source expression and span.
 
-Callable bodies are retained internally as half-open token ranges and scanned without javac attribution. An unqualified call or `this.method(...)` considers only methods declared on the same modeled owner with a matching name and accepted arity. For `receiver.method(...)`, a receiver identifier whose type is explicit on a callable parameter or a simple declaration-before-use local variable resolves through the same package/import/lexical type rules and considers only non-static methods declared directly on the unique repository-local receiver type. Local evidence is block-scoped and does not create local-variable nodes. When that lookup produces multiple exact-arity overloads, `null`, boolean, string, char, integral, and floating-point literals plus explicitly typed simple parameter/local arguments may eliminate assignment-incompatible candidates. Exact declared types and directly safe primitive widening/boxing buckets are preferred only when one candidate dominates without argument tradeoffs; unknown conversions, generic or varargs forms, multi-argument tradeoffs, and reference-only `null` candidates remain possible. In particular, `null` excludes primitive parameters but does not choose among remaining reference overloads. `Type.method(...)` considers static methods only after `Type` uniquely resolves to a repository-local declaration. `new Type(...)`, `this(...)`, and `super(...)` similarly consider only modeled constructors with an accepted arity; `super(...)` requires one resolved direct superclass. One candidate emits `calls`; multiple overload candidates emit one `possible-calls` edge per candidate. External or ambiguous receiver types, dynamic or chained receivers, unsupported expressions, inherited/otherwise unsupported lookup, and malformed calls remain unresolved `calls` evidence rather than guessed edges.
+Callable bodies are first scanned by the deterministic fallback resolver, then reconciled against javac attribution. Exact compiler facts replace competing heuristic `calls`, `possible-calls`, `reads`, `writes`, and unresolved evidence at the same source site. Compiler errors are indexed by source line; facts touching an erroneous region are not trusted, leaving conservative fallback candidates or unresolved evidence intact rather than accepting javac recovery guesses.
 
-A modeled non-static, non-private method emits `overrides` to matching methods on each uniquely resolved direct superclass or interface. Matching is deliberately limited to the exact declared method name and normalized ordered parameter-type signature. Static, private, and final parent methods are excluded. The adapter does not apply generic substitution or infer transitive override relationships.
-
-Body dataflow is limited to simple identifier and member forms whose target is a modeled callable parameter or field. Unqualified parameters take precedence over fields; `this.field` identifies a same-owner field; `super.field` requires a resolved direct superclass; and `Type.field` requires a unique repository-local type and modeled static field. Direct assignment emits `writes`; compound assignment and increment/decrement emit both `reads` and `writes`; other supported references emit `reads`. Simple local declarations are retained only as shadowing evidence and never become invented nodes. Dynamic, external, ambiguous, or unsupported member/write evidence remains unresolved.
+Only repository-local modeled declarations become graph endpoints. External JDK and dependency symbols still inform attribution but are not invented as Lexicon nodes. Implicit constructors, local variables, lambdas, anonymous classes, and local classes remain unmodeled nodes; their bodies are not incorrectly attributed to the enclosing callable. Local-variable access suppresses false field/parameter evidence without creating local-variable nodes.
 
 ## Canonical identities and paths
 
@@ -95,9 +94,20 @@ The adapter excludes Git/worktree metadata (`.git`, `.worktrees`, `.workingtrees
 
 ## Current boundaries
 
-This adapter uses a deterministic conservative Java lexer and declaration parser rather than javac attribution. It does not model implicit or transitive inheritance, virtual dispatch, overload resolution beyond the bounded typed-receiver literal/declared-identifier slice, inherited unqualified calls, instance-receiver inference beyond explicitly typed parameter/simple-local identifiers, statically imported call targets, implicit/default constructors, initializer-body semantics, module descriptors, local/anonymous classes, lambda ownership, local-variable nodes, alias/control-flow dataflow, effective Maven models, Gradle build models, property/profile/BOM/version-catalog resolution, project or platform dependencies, transitive dependencies, classpath resolution, generated sources, or incremental scope. It does not execute a compiler or infer targets from same-named declarations outside the explicitly supported lookups. Argument narrowing does not perform general expression typing, generic inference, user-defined reference conversion analysis, or compiler-equivalent applicability/specificity resolution. Override evidence does not apply generic substitution, module accessibility, visibility beyond explicit modifiers and same-package declarations, bridge methods, covariant-return analysis, or transitive ancestry. Reads/writes do not claim array-element, chained-expression, reflective, alias, or interprocedural ownership. Annotation values, target legality, repeatable expansion, inherited annotations, and type-use placement are not semantically interpreted.
+The compiler pass groups source files by Java source root and provides all eligible roots as a deterministic source path. Annotation processing is disabled. Embedded fixture projects beneath `src/test/resources` and `src/test/projects` remain available to the deterministic parser but are not sent through javac as part of the host repository. It does not evaluate Maven or Gradle builds, download dependencies, execute plugins, load generated sources, or execute analyzed code. Missing third-party classpaths can therefore leave external and some downstream expressions unresolved, but repository-local symbols that javac can attribute still produce exact edges. A compiler failure is isolated by recursively splitting the affected source-root batch; only irreducible failing files fall back completely to the deterministic parser.
+
+The adapter does not create nodes for implicit/default constructors, initializer bodies, module descriptors, local/anonymous classes, lambdas, or local variables. It does not model reflection, runtime dependency injection, framework-generated dispatch, alias/control-flow dataflow, array-element ownership, effective Maven models, Gradle build models, profiles, BOMs, version catalogs, transitive dependencies, or generated code. Annotation values and repeatable/inherited semantics are not interpreted. Incremental compiler attribution is not yet implemented; each changed Java analysis currently reprocesses the discovered source-root batches.
 
 Malformed literals/comments, unclosed type/member bodies, malformed package/import syntax, and member forms that cannot be classified safely remain explicit `unsupported-form` unresolved records. Valid declarations already isolated before a later malformed region may still be emitted; the unresolved record preserves the unsupported boundary. Invalid UTF-8 or NUL-containing files retain file/module evidence and emit an unresolved `defines` record.
+
+## Code map
+
+| Concern | Primary implementation | Verification |
+| --- | --- | --- |
+| Discovery, parsing, declarations, and dependencies | `discovery.go`, `parser*.go`, `dependencies.go`, `maven_dependencies.go`, `gradle_dependencies.go` | package-local fixture tests |
+| Conservative fallback semantics | `relationships.go`, `runtime_*.go` | relationship and runtime tests |
+| Compiler-backed attribution | `compiler_runner.go`, `compiler_facts.go`, `compiler/src/` | compiler semantic and evidence-replacement tests |
+| Runtime discovery and release packaging | `compiler_environment.go`, `compiler_runtime.go`, `tools/java_release.py` | adapter tests and packaging smoke checks |
 
 ## Test
 

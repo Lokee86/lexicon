@@ -115,7 +115,7 @@ func assertDependencyNode(t *testing.T, nodes map[string]map[string]any, coordin
 	if node["kind"] != "module" || attributes["dependency"] != true || attributes["ecosystem"] != "maven" {
 		t.Fatalf("external dependency module %s = %#v", coordinate, node)
 	}
-	expectedPath := ".lexicon/dependencies/maven/" + strings.ReplaceAll(coordinate, ":", "/")
+	expectedPath := "@dependencies/maven/" + strings.ReplaceAll(coordinate, ":", "/")
 	if node["path"] != expectedPath {
 		t.Fatalf("external dependency path = %v, want %s", node["path"], expectedPath)
 	}

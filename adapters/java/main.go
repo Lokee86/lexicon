@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const adapterVersion = "0.3.0"
+const adapterVersion = "0.4.0"
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {

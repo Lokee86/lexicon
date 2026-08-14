@@ -36,6 +36,15 @@ dotnet run --project adapters/csharp/Lexicon.CSharp.csproj -- \
 
 Incremental scope uses repeated `--changed-file` and `--removed-file` arguments with normalized repository-relative paths. Project loading still uses complete repository context before owner-filtered emission.
 
+## Code map
+
+| Concern | Primary implementation | Verification |
+| --- | --- | --- |
+| CLI and project-loading selection | `Program.cs`, `Discovery.cs`, `MsBuildDiscovery.cs` | `tests/test_adapter.py` |
+| Roslyn declarations and symbols | `Analysis.cs`, `AnalysisSymbols.cs`, `Facts.cs` | smoke and project-graph fixtures |
+| Calls, inheritance, overrides, reads, and writes | `AnalysisRelations.cs`, `AnalysisDataflow.cs` | relation and endpoint assertions |
+| Packaged runtime | `Lexicon.CSharp.csproj`, `tools/package_release.py` | release workflow tests |
+
 ## Test
 
 ```text

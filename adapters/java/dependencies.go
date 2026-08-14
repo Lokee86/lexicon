@@ -64,7 +64,7 @@ func buildSystem(kind string) string {
 
 func addExternalDependency(facts *factSet, coordinate string) string {
 	identity := "dependency:maven:" + coordinate
-	path := ".lexicon/dependencies/maven/" + strings.ReplaceAll(coordinate, ":", "/")
+	path := "@dependencies/maven/" + strings.ReplaceAll(coordinate, ":", "/")
 	return facts.addNode(
 		"module", coordinate, path, identity, identity, "", nil,
 		map[string]any{"dependency": true, "ecosystem": "maven"}, "",

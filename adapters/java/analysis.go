@@ -68,6 +68,9 @@ func analyzeRepository(repository string) ([]byte, error) {
 	state.resolveImports()
 	state.resolveRelationships()
 	state.resolveRuntimeSemantics()
+	if err := state.resolveCompilerSemantics(snapshot); err != nil {
+		return nil, err
+	}
 	return facts.render(snapshot.name)
 }
 

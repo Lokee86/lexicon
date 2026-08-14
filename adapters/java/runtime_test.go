@@ -16,19 +16,19 @@ func TestRuntimeCallsResolveDefinitePossibleAndExternalTargets(t *testing.T) {
 
 	for _, target := range []string{
 		"demo.runtime.RuntimeSlice.definite(int)",
+		"demo.runtime.RuntimeSlice.overloaded(int)",
 		"demo.runtime.Helper.staticCall(int)",
 		"demo.runtime.Helper.<init>(int)",
+		"demo.runtime.Choice.<init>(int)",
 		"demo.runtime.RuntimeSlice.<init>(int)",
 	} {
 		assertRuntimeEdge(t, records, nodes, caller, target, "calls")
 	}
 	for _, target := range []string{
-		"demo.runtime.RuntimeSlice.overloaded(int)",
 		"demo.runtime.RuntimeSlice.overloaded(String)",
-		"demo.runtime.Choice.<init>(int)",
 		"demo.runtime.Choice.<init>(String)",
 	} {
-		assertRuntimeEdge(t, records, nodes, caller, target, "possible-calls")
+		assertNoRuntimeEdge(t, records, nodes, caller, target, "possible-calls")
 	}
 
 	assertRuntimeUnresolved(t, records, nodes, caller, "calls", "external.run()", "external-target")
@@ -42,9 +42,10 @@ func TestTypedIdentifierReceiverCallsStayBoundedAndScoped(t *testing.T) {
 	nodes := nodeIndex(records)
 	target := "demo.receivers.ReceiverTarget.unique(int)"
 
-	assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", target, "calls")
-	assertRuntimeUnresolved(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", "calls", "receiver.inherited()", "unsupported-form")
-	assertNoRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)", "demo.receivers.ReceiverBase.inherited()", "calls")
+	parameterCaller := "demo.receivers.ReceiverCalls.parameter(ReceiverTarget)"
+	assertRuntimeEdge(t, records, nodes, parameterCaller, target, "calls")
+	assertRuntimeEdge(t, records, nodes, parameterCaller, "demo.receivers.ReceiverBase.inherited()", "calls")
+	assertNoRuntimeUnresolved(t, records, nodes, parameterCaller, "calls", "receiver.inherited()")
 	assertRuntimeEdge(t, records, nodes, "demo.receivers.ReceiverCalls.local()", target, "calls")
 	overloadedCaller := "demo.receivers.ReceiverCalls.overloaded(ReceiverTarget)"
 	assertRuntimeEdge(t, records, nodes, overloadedCaller, "demo.receivers.ReceiverTarget.overloaded(int)", "calls")
@@ -57,10 +58,10 @@ func TestTypedIdentifierReceiverCallsStayBoundedAndScoped(t *testing.T) {
 	assertRuntimeEdge(t, records, nodes, scope, target, "calls")
 	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "future.unique(1)", "dynamic-target")
 	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "inner.unique(1)", "dynamic-target")
-	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "ReceiverTarget.staticOnly()", "unsupported-form")
+	assertRuntimeEdge(t, records, nodes, scope, "demo.receivers.ReceiverTarget.staticOnly()", "calls")
+	assertNoRuntimeUnresolved(t, records, nodes, scope, "calls", "ReceiverTarget.staticOnly()")
 	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "unique(1)", "dynamic-target")
 	assertRuntimeUnresolved(t, records, nodes, scope, "calls", "unknown.unique(1)", "dynamic-target")
-	assertNoRuntimeEdge(t, records, nodes, scope, "demo.receivers.ReceiverTarget.staticOnly()", "calls")
 	assertAllEndpoints(t, records, nodes)
 }
 
@@ -139,7 +140,7 @@ func TestRuntimeReadsWritesStayOnModeledFieldsAndParameters(t *testing.T) {
 	shadow := "demo.runtime.RuntimeSlice.shadow(int)"
 	assertNoRuntimeEdge(t, records, nodes, shadow, "demo.runtime.RuntimeSlice.field", "reads")
 	assertNoRuntimeEdge(t, records, nodes, shadow, "demo.runtime.RuntimeSlice.field", "writes")
-	assertRuntimeUnresolved(t, records, nodes, shadow, "writes", "field", "dynamic-target")
+	assertNoRuntimeUnresolved(t, records, nodes, shadow, "writes", "field")
 }
 
 func TestRuntimeSemanticsDoNotClaimNestedCallableBodies(t *testing.T) {
@@ -306,6 +307,16 @@ func assertNoRuntimeEdge(t *testing.T, records []map[string]any, nodes map[strin
 	for _, record := range records {
 		if record["record"] == "edge" && record["relation"] == relation && record["source"] == source["id"] && record["target"] == target["id"] {
 			t.Fatalf("unexpected %s edge %s -> %s", relation, sourceName, targetName)
+		}
+	}
+}
+
+func assertNoRuntimeUnresolved(t *testing.T, records []map[string]any, nodes map[string]map[string]any, sourceName, relation, expression string) {
+	t.Helper()
+	source := nodes[sourceName]
+	for _, record := range records {
+		if record["record"] == "unresolved" && record["source"] == source["id"] && record["relation"] == relation && record["expression"] == expression {
+			t.Fatalf("unexpected unresolved %s %s %q", sourceName, relation, expression)
 		}
 	}
 }

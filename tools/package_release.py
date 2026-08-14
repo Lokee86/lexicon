@@ -12,6 +12,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from java_release import build_java_adapter
+
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_SOURCE_PARTS = {
     ".git", ".pytest_cache", "__pycache__", "build", "dist", "node_modules",
@@ -178,8 +180,9 @@ def build_distribution(repo: Path, output: Path, version: str | None = None) -> 
 
     lexicon = output / executable_name("lexicon")
     run(go_build_command(lexicon, "./cmd/lexicon", version), repo)
-    for language in ("go", "gdscript", "java", "kotlin", "generic"):
+    for language in ("go", "gdscript", "kotlin", "generic"):
         build_go_adapter(repo, adapters / language / executable_name("lexicon-" + language), language)
+    build_java_adapter(repo, adapters / "java")
 
     rust_output = adapters / "rust" / executable_name("lexicon-rust")
     rust = repo / "adapters" / "rust"
